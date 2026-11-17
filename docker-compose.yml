@@ -1,0 +1,132 @@
+# SAUDARO local stack. NOT VERIFIED LOCALLY: Docker is not installed on the author's machine, so this file has
+# been written against the apps' real env schemas but never executed. Run `docker compose config` first, then
+# `docker compose up --build`. Only implemented components appear here (gateway, identity, company); services
+# are added when they exist. Redis/RabbitMQ are behind the "messaging" profile because no code consumes them yet.
+name: saudaro
+
+x-service-env: &service-env
+  NODE_ENV: development
+  HOST: 0.0.0.0
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: saudaro-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-saudaro_marketplace}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root123}
+    ports:
+      - '127.0.0.1:5432:5432' # loopback only
+    volumes:
+      - saudaro_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-saudaro_marketplace}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: creates per-service roles/schemas and applies migrations, then exits.
+  db-init:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: tools
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-root123}@postgres:5432/${POSTGRES_DB:-saudaro_marketplace}
+      IDENTITY_SVC_PASSWORD: ${IDENTITY_SVC_PASSWORD:-identity_svc_dev_pass}
+      IDENTITY_MIGRATOR_PASSWORD: ${IDENTITY_MIGRATOR_PASSWORD:-identity_migrator_dev_pass}
+      COMPANY_SVC_PASSWORD: ${COMPANY_SVC_PASSWORD:-company_svc_dev_pass}
+      COMPANY_MIGRATOR_PASSWORD: ${COMPANY_MIGRATOR_PASSWORD:-company_migrator_dev_pass}
+    restart: 'no'
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: runtime
+      args: { SERVICE: identity-service }
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+    environment:
+      <<: *service-env
+      PORT: '4001'
+      DATABASE_URL: postgres://identity_svc:${IDENTITY_SVC_PASSWORD:-identity_svc_dev_pass}@postgres:5432/${POSTGRES_DB:-saudaro_marketplace}
+      COMPANY_SERVICE_URL: http://company-service:4002
+      AUTH_SIGNING_JWK: ${AUTH_SIGNING_JWK:?run npm run keys:generate and set it in .env}
+      AUTH_PUBLIC_JWKS: ${AUTH_PUBLIC_JWKS:?run npm run keys:generate and set it in .env}
+    ports: ['127.0.0.1:4001:4001']
+
+  company-service:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: runtime
+      args: { SERVICE: company-service }
+    restart: unless-stopped
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+    environment:
+      <<: *service-env
+      PORT: '4002'
+      DATABASE_URL: postgres://company_svc:${COMPANY_SVC_PASSWORD:-company_svc_dev_pass}@postgres:5432/${POSTGRES_DB:-saudaro_marketplace}
+      AUTH_PUBLIC_JWKS: ${AUTH_PUBLIC_JWKS:?run npm run keys:generate and set it in .env}
+    ports: ['127.0.0.1:4002:4002']
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: runtime
+      args: { SERVICE: api-gateway }
+    restart: unless-stopped
+    environment:
+      <<: *service-env
+      PORT: '4000'
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      IDENTITY_SERVICE_URL: http://identity-service:4001
+      COMPANY_SERVICE_URL: http://company-service:4002
+      GATEWAY_SIGNING_JWK: ${GATEWAY_SIGNING_JWK:?run npm run keys:generate and set it in .env}
+      AUTH_PUBLIC_JWKS: ${AUTH_PUBLIC_JWKS:?run npm run keys:generate and set it in .env}
+    ports: ['127.0.0.1:4000:4000']
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    command: ['--config=/etc/otel/config.yaml']
+    volumes:
+      - ./infrastructure/monitoring/otel-collector.yaml:/etc/otel/config.yaml:ro
+    depends_on: [jaeger]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.64.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports: ['127.0.0.1:16686:16686']
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ['127.0.0.1:9090:9090']
+
+  # --- RabbitMQ relay + Redis rate-limit store: no code uses them yet. Opt in with
+  # `docker compose --profile messaging up`.
+  redis:
+    profiles: [messaging]
+    image: redis:7-alpine
+    ports: ['127.0.0.1:6379:6379']
+
+  rabbitmq:
+    profiles: [messaging]
+    image: rabbitmq:3.13-management-alpine
+    ports: ['127.0.0.1:5672:5672', '127.0.0.1:15672:15672']
+
+volumes:
+  saudaro_pgdata:

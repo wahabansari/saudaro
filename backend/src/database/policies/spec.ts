@@ -147,6 +147,9 @@ const quotationRevisionChildren = [
     ] as const,
 );
 
+/** The row's RFQ is one the active company may see (published, unexpired, passes visibility rules). */
+const PUBLIC_RFQ = 'rfq_id in (select id from app.public_rfqs)';
+
 export const SPEC: Record<string, TablePolicy> = {
   // ---------------------------------------------------------------- reference
   ...Object.fromEntries(refEntries),
@@ -354,16 +357,14 @@ export const SPEC: Record<string, TablePolicy> = {
     select: `${own()} OR (status = 'active' AND ${pubCo()})`,
     insert: ownW('catalog.manage'),
     update: { using: ownW('catalog.manage'), check: ownW('catalog.manage') },
-    delete: ownW('catalog.manage'),
-    worker: 's',
+    worker: 's', // no delete: business records are archived, never hard-deleted (see 0007)
   },
   ...Object.fromEntries(productChildren),
   seller_product_listings: {
     select: `${own()} OR (status = 'active' AND ${pubCo()})`,
     insert: ownW('catalog.manage'),
     update: { using: ownW('catalog.manage'), check: ownW('catalog.manage') },
-    delete: ownW('catalog.manage'),
-    worker: 's',
+    worker: 's', // no delete: business records are archived, never hard-deleted (see 0007)
   },
 
   // ---------------------------------------------------------------- seller profile (public-when-published vs private)
@@ -458,20 +459,20 @@ export const SPEC: Record<string, TablePolicy> = {
       'required_by_date',
     ],
   },
-  rfq_trade_requirements: { ...T('rfq.create'), worker: 's' },
+  rfq_trade_requirements: { ...T('rfq.create', { extra: PUBLIC_RFQ }), worker: 's' },
   rfq_payment_preferences: { ...T('rfq.create'), worker: 's' },
   rfq_origin_preferences: { ...T('rfq.create'), worker: 's' },
-  rfq_required_documents: { ...T('rfq.create'), worker: 's' },
-  rfq_certification_requirements: { ...T('rfq.create'), worker: 's' },
+  rfq_required_documents: { ...T('rfq.create', { extra: PUBLIC_RFQ }), worker: 's' },
+  rfq_certification_requirements: { ...T('rfq.create', { extra: PUBLIC_RFQ }), worker: 's' },
   rfq_visibility_rules: { ...T('rfq.create'), worker: 's', authz: 's' },
-  rfq_attachments: T('rfq.create', { extra: 'rfq_id in (select id from app.public_rfqs)' }),
+  rfq_attachments: T('rfq.create', { extra: PUBLIC_RFQ }),
   rfq_status_history: { select: own(), worker: 's', authz: 'i' },
   rfq_invitations: {
     select: `${own()} OR invited_company_id = ${A}`,
     insert: ownW('rfq.manage'),
     update: {
-      using: `${ownW('rfq.manage')} OR invited_company_id = ${W}`,
-      check: `${ownW('rfq.manage')} OR invited_company_id = ${W}`,
+      using: `${ownW('rfq.manage')} OR (invited_company_id = ${W} AND ${can('quotation.create')})`,
+      check: `${ownW('rfq.manage')} OR (invited_company_id = ${W} AND ${can('quotation.create')})`,
     },
     updateCols: ['status', 'responded_at'],
     delete: ownW('rfq.manage'),
@@ -497,12 +498,15 @@ export const SPEC: Record<string, TablePolicy> = {
   // ---------------------------------------------------------------- matching (worker-written, advisory)
   rfq_match_runs: { select: own(), worker: 'siu' },
   rfq_supplier_matches: {
-    select: `buyer_company_id = ${A} OR supplier_company_id = ${A}`,
+    select: `buyer_company_id = ${A} OR (supplier_company_id = ${A} AND ${PUBLIC_RFQ})`,
     update: { using: `supplier_company_id = ${W}`, check: `supplier_company_id = ${W}` },
     updateCols: ['status'],
     worker: 'siu',
   },
-  rfq_match_reasons: { select: `supplier_company_id = ${A}`, worker: 'si' },
+  rfq_match_reasons: {
+    select: `supplier_company_id = ${A} AND match_id in (select id from public.rfq_supplier_matches where ${PUBLIC_RFQ})`,
+    worker: 'si',
+  },
   supplier_match_preferences: { ...T('seller_profile.manage'), worker: 's' },
   supplier_match_feedback: { ...T('seller_profile.manage', { noDelete: true }), worker: 's' },
 
@@ -766,4 +770,49 @@ export const SPEC: Record<string, TablePolicy> = {
     delete: `user_id = ${U}`,
     worker: 'sd',
   },
+};
+
+/**
+ * The policies exactly as 0005 created them, for the tables 0007 changed. SPEC describes the FINAL
+ * database; the drift test regenerates 0005 from SPEC + these overrides, so 0005 stays verified
+ * byte-for-byte while 0007 is verified by behaviour tests and the catalog.
+ */
+const OWN_CRUD = (perm: string): TablePolicy => ({
+  select: own(),
+  insert: ownW(perm),
+  update: { using: ownW(perm), check: ownW(perm) },
+  delete: ownW(perm),
+});
+const CATALOG_0005: TablePolicy = {
+  select: `${own()} OR (status = 'active' AND ${pubCo()})`,
+  insert: ownW('catalog.manage'),
+  update: { using: ownW('catalog.manage'), check: ownW('catalog.manage') },
+  delete: ownW('catalog.manage'),
+  worker: 's',
+};
+export const BASELINE_0005: Record<string, TablePolicy> = {
+  products: CATALOG_0005,
+  seller_product_listings: CATALOG_0005,
+  rfq_trade_requirements: { ...OWN_CRUD('rfq.create'), worker: 's' },
+  rfq_required_documents: { ...OWN_CRUD('rfq.create'), worker: 's' },
+  rfq_certification_requirements: { ...OWN_CRUD('rfq.create'), worker: 's' },
+  rfq_invitations: {
+    select: `${own()} OR invited_company_id = ${A}`,
+    insert: ownW('rfq.manage'),
+    update: {
+      using: `${ownW('rfq.manage')} OR invited_company_id = ${W}`,
+      check: `${ownW('rfq.manage')} OR invited_company_id = ${W}`,
+    },
+    updateCols: ['status', 'responded_at'],
+    delete: ownW('rfq.manage'),
+    worker: 's',
+    authz: 's',
+  },
+  rfq_supplier_matches: {
+    select: `buyer_company_id = ${A} OR supplier_company_id = ${A}`,
+    update: { using: `supplier_company_id = ${W}`, check: `supplier_company_id = ${W}` },
+    updateCols: ['status'],
+    worker: 'siu',
+  },
+  rfq_match_reasons: { select: `supplier_company_id = ${A}`, worker: 'si' },
 };

@@ -1,0 +1,60 @@
+{
+  "name": "saudaro",
+  "version": "0.2.0",
+  "private": true,
+  "description": "SAUDARO — global B2B import-export marketplace (monorepo: gateway, services, packages)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/backend/api-gateway",
+    "apps/backend/services/*",
+    "apps/backend/workers/*"
+  ],
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build": "tsx scripts/build.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "health-check": "tsx scripts/health-check.ts",
+    "database-check": "tsx scripts/database-check.ts",
+    "keys:generate": "tsx scripts/gen-keys.ts",
+    "db:bootstrap": "tsx scripts/db-bootstrap.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:purge": "tsx scripts/db-purge.ts",
+    "docs:data-dictionary": "tsx scripts/gen-data-dictionary.ts",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "@types/supertest": "^7.2.0",
+    "drizzle-kit": "^0.31.0",
+    "embedded-postgres": "^18.0.0-beta.1",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.39.0",
+    "prettier": "^3.6.0",
+    "supertest": "^7.2.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.40.0",
+    "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "@graphql-tools/utils": "^13.2.2"
+  },
+  "allowScripts": {
+    "esbuild@0.18.20": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.2": true,
+    "@embedded-postgres/windows-x64@18.0.0-beta.15": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@saudaro/service-kit",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@saudaro/authentication": "*",
+    "@saudaro/error-handling": "*",
+    "@saudaro/logger": "*",
+    "@saudaro/observability": "*",
+    "compression": "^1.8.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.8.0"
+  }
+}

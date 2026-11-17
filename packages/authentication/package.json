@@ -1,0 +1,14 @@
+{
+  "name": "@saudaro/authentication",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@saudaro/error-handling": "*",
+    "jose": "^6.1.0",
+    "zod": "^4.0.0"
+  }
+}

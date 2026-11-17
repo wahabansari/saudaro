@@ -1,0 +1,2 @@
+CREATE INDEX "ix_refresh_tokens_session_id" ON "identity"."refresh_tokens" USING btree ("session_id");--> statement-breakpoint
+CREATE INDEX "ix_sessions_user_id" ON "identity"."sessions" USING btree ("user_id");

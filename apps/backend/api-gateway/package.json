@@ -1,0 +1,29 @@
+{
+  "name": "@saudaro/api-gateway",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.0.0",
+    "@as-integrations/express5": "^1.1.0",
+    "@saudaro/api-contracts": "*",
+    "@saudaro/authentication": "*",
+    "@saudaro/error-handling": "*",
+    "@saudaro/graphql-contracts": "*",
+    "@saudaro/logger": "*",
+    "@saudaro/observability": "*",
+    "@saudaro/service-kit": "*",
+    "@saudaro/validation": "*",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "graphql": "^16.11.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17"
+  }
+}

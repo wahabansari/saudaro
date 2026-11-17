@@ -139,7 +139,8 @@ WHERE c.status = 'active'`,
   },
 ] as const;
 
-export function buildMigrationSql(): string {
+export function buildMigrationSql(overrides: Record<string, TablePolicy> = {}): string {
+  const spec = { ...SPEC, ...overrides };
   const tables = schemaTables();
   const missing = tables.filter((t) => !(t in SPEC));
   const unknown = Object.keys(SPEC).filter((t) => !tables.includes(t));
@@ -174,7 +175,7 @@ $do$`);
   }
   // Ownership moves last: afterwards the migrator can no longer read/grant them.
   for (const v of VIEWS) statements.push(`ALTER VIEW app.${v.name} OWNER TO saudaro_pub`);
-  for (const t of tables) statements.push(...tableStatements(t, SPEC[t]!));
+  for (const t of tables) statements.push(...tableStatements(t, spec[t]!));
   statements.push('REVOKE CREATE ON SCHEMA app FROM saudaro_authz, saudaro_pub');
 
   const header = `-- 0005: row-level security policies, privileges, projection views.
@@ -192,7 +193,7 @@ if (isMain) {
   const dir = new URL('../migrations/', import.meta.url);
   const file = readdirSync(dir).find((f) => /^0005_.*\.sql$/.test(f));
   if (!file) throw new Error('0005 migration file not found; run drizzle-kit generate --custom first');
-  const sql = buildMigrationSql();
+  const sql = buildMigrationSql(BASELINE_0005); // 0005 is applied history; 0007 carries the later changes
   writeFileSync(new URL(file, dir), sql);
   console.log(`wrote ${file} (${sql.split('\n').length} lines, ${schemaTables().length} tables)`);
 }

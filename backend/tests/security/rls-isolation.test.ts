@@ -330,6 +330,38 @@ describe('7. Public RFQs expose only intentionally public fields', () => {
     expect(direct.rowCount).toBe(0);
   });
 
+  it('public RFQ requirements (documents, certifications, trade terms) are visible to suppliers; preferences stay private', async () => {
+    const r = await w.rfq(A, uA, { title: 'Requirements RFQ' });
+    const draft = await w.rfq(A, uA, { status: 'draft', title: 'Requirements draft' });
+    const cert = await w.one<{ id: string }>('select id from certifications limit 1');
+    for (const id of [r.id, draft.id]) {
+      await w.admin.query(
+        `insert into rfq_required_documents (rfq_id, company_id, document_type) values ($1,$2,'commercial_invoice')`,
+        [id, A],
+      );
+      await w.admin.query(
+        `insert into rfq_certification_requirements (rfq_id, company_id, certification_id) values ($1,$2,$3)`,
+        [id, A, cert.id],
+      );
+      await w.admin.query(`insert into rfq_trade_requirements (rfq_id, company_id) values ($1,$2)`, [id, A]);
+    }
+    await w.admin.query(
+      `insert into rfq_visibility_rules (rfq_id, company_id, rule_type, country_id) values ($1,$2,'block_country',$3)`,
+      [r.id, A, await w.country('US')],
+    );
+    const ctx = { userId: uS1, companyId: S1 };
+    for (const t of ['rfq_required_documents', 'rfq_certification_requirements', 'rfq_trade_requirements']) {
+      const rows = await as(pool, ctx, (tx) => tx.client.query(`select rfq_id from ${t}`));
+      expect(
+        rows.rows.map((x) => x.rfq_id),
+        t,
+      ).toEqual([r.id]); // published public RFQ only, never the draft
+    }
+    for (const t of ['rfq_visibility_rules', 'rfq_payment_preferences', 'rfq_origin_preferences']) {
+      expect((await as(pool, ctx, (tx) => tx.client.query(`select 1 from ${t}`))).rowCount, t).toBe(0);
+    }
+  });
+
   it('invited-only RFQs are visible only to invited suppliers; blocked countries are excluded', async () => {
     const inv = await w.rfq(A, uA, { visibility: 'invited', title: 'Invite only' });
     const names = async (ctx: { userId: string; companyId: string }) =>
@@ -343,6 +375,38 @@ describe('7. Public RFQs expose only intentionally public fields', () => {
     );
     expect(await names({ userId: uS1, companyId: S1 })).toContain('Invite only');
     expect(await names({ userId: uS2, companyId: S2 })).not.toContain('Invite only');
+
+    // Match rows follow the RFQ's visibility: a supplier never learns of an RFQ it cannot see.
+    const run = await w.one<{ id: string }>(
+      `insert into rfq_match_runs (rfq_id, company_id, algorithm_version) values ($1,$2,'t1') returning id`,
+      [inv.id, A],
+    );
+    const matchIds: Record<string, string> = {};
+    for (const [key, sup, eligible] of [
+      ['s1', S1, true],
+      ['s2', S2, false],
+    ] as const) {
+      matchIds[key] = (
+        await w.one<{ id: string }>(
+          `insert into rfq_supplier_matches (match_run_id, rfq_id, buyer_company_id, supplier_company_id, score, rank, is_eligible)
+           values ($1,$2,$3,$4,50,1,$5) returning id`,
+          [run.id, inv.id, A, sup, eligible],
+        )
+      ).id;
+      await w.admin.query(
+        `insert into rfq_match_reasons (match_id, supplier_company_id, reason_code, passed, weight) values ($1,$2,'category_match',true,1)`,
+        [matchIds[key], sup],
+      );
+    }
+    const seen = async (ctx: { userId: string; companyId: string }, table: string) =>
+      (await as(pool, ctx, (tx) => tx.client.query(`select id from ${table}`))).rowCount;
+    for (const table of ['rfq_supplier_matches', 'rfq_match_reasons']) {
+      expect(await seen({ userId: uS2, companyId: S2 }, table), table).toBe(0); // not invited, not eligible
+      expect(await seen({ userId: uS1, companyId: S1 }, table), table).toBe(1); // invited
+    }
+    expect(await seen({ userId: uA, companyId: A }, 'rfq_supplier_matches')).toBe(2); // buyer sees all
+    await w.admin.query('delete from rfq_invitations where rfq_id = $1', [inv.id]);
+    expect(await seen({ userId: uS1, companyId: S1 }, 'rfq_supplier_matches')).toBe(0); // invitation revoked
 
     const geo = await w.rfq(A, uA, { title: 'No Pakistan' });
     await w.admin.query(

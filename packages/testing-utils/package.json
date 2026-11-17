@@ -1,0 +1,13 @@
+{
+  "name": "@saudaro/testing-utils",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "embedded-postgres": "^18.0.0-beta.1",
+    "pg": "^8.16.0"
+  }
+}

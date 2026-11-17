@@ -129,3 +129,141 @@ describe('closed quotations cannot receive a late revision', () => {
     expect(err.message).toMatch(/quotation is closed/);
   });
 });
+
+async function newProduct(companyId: string, status = 'draft'): Promise<string> {
+  const s = Math.random().toString(36).slice(2, 10);
+  return (
+    await w.one<{ id: string }>(
+      `insert into products (company_id, name, slug, primary_category_id, base_uom_id, status, published_at)
+       values ($1, $2, $2, $3, $4, $5, case when $5 = 'active' then now() end) returning id`,
+      [companyId, `P ${s}`, await w.category('rice'), await w.uom('KGM'), status],
+    )
+  ).id;
+}
+
+async function newListing(productId: string): Promise<string> {
+  return (
+    await w.one<{ id: string }>(
+      `insert into seller_product_listings (company_id, product_id) select company_id, id from products where id = $1 returning id`,
+      [productId],
+    )
+  ).id;
+}
+
+describe('business records are never hard-deleted by the application role', () => {
+  it('products and seller_product_listings reject DELETE with insufficient_privilege', async () => {
+    const u = await w.user();
+    const X = await w.company(u);
+    const product = await newProduct(X);
+    await newListing(product);
+    for (const table of ['products', 'seller_product_listings']) {
+      const err = await expectDbError(pool, { userId: u, companyId: X }, `delete from ${table}`);
+      expect(err.code, table).toBe('42501');
+    }
+    const n = await w.one<{ n: string }>('select count(*)::text n from products where id = $1', [product]);
+    expect(n.n).toBe('1');
+  });
+});
+
+describe('product and listing status governance', () => {
+  const setStatus = (table: string, id: string, status: string) =>
+    `update ${table} set status = '${status}' where id = '${id}'`;
+
+  it('products: draft -> active sets published_at; only the allowed transitions pass', async () => {
+    const u = await w.user();
+    const X = await w.company(u);
+    const ctx = { userId: u, companyId: X };
+    const id = await newProduct(X);
+    await as(pool, ctx, (tx) => tx.client.query(setStatus('products', id, 'active')));
+    const row = await w.one<{ status: string; published_at: string | null }>(
+      'select status, published_at from products where id = $1',
+      [id],
+    );
+    expect(row.status).toBe('active');
+    expect(row.published_at).not.toBeNull();
+    for (const bad of ['draft', 'suspended']) {
+      const err = await expectDbError(pool, ctx, setStatus('products', id, bad));
+      expect(err.code, bad).toBe('42501');
+    }
+    await as(pool, ctx, (tx) => tx.client.query(setStatus('products', id, 'archived')));
+    const err = await expectDbError(pool, ctx, setStatus('products', id, 'active'));
+    expect(err.code).toBe('42501');
+    await as(pool, ctx, (tx) => tx.client.query(setStatus('products', id, 'draft'))); // archived -> draft
+  });
+
+  it('products: suspension is moderation-only (cannot be set or left by the app role)', async () => {
+    const u = await w.user();
+    const X = await w.company(u);
+    const ctx = { userId: u, companyId: X };
+    const id = await newProduct(X, 'active');
+    expect((await expectDbError(pool, ctx, setStatus('products', id, 'suspended'))).code).toBe('42501');
+    await w.admin.query("update products set status = 'suspended' where id = $1", [id]); // trusted caller
+    for (const to of ['active', 'draft', 'archived']) {
+      expect((await expectDbError(pool, ctx, setStatus('products', id, to))).code, to).toBe('42501');
+    }
+    await w.admin.query("update products set status = 'active' where id = $1", [id]);
+  });
+
+  it('listings: draft/active/paused/archived follow the same lifecycle', async () => {
+    const u = await w.user();
+    const X = await w.company(u);
+    const ctx = { userId: u, companyId: X };
+    const l = await newListing(await newProduct(X));
+    const t = 'seller_product_listings';
+    expect((await expectDbError(pool, ctx, setStatus(t, l, 'paused'))).code).toBe('42501'); // draft -> paused
+    for (const to of ['active', 'paused', 'active', 'archived', 'draft']) {
+      await as(pool, ctx, (tx) => tx.client.query(setStatus(t, l, to)));
+    }
+    await as(pool, ctx, (tx) => tx.client.query(setStatus(t, l, 'archived')));
+    expect((await expectDbError(pool, ctx, setStatus(t, l, 'active'))).code).toBe('42501');
+  });
+});
+
+describe('rfq_invitations responses', () => {
+  async function invitation() {
+    const [uB, uS] = [await w.user(), await w.user()];
+    const [B, S] = [await w.company(uB), await w.company(uS)];
+    const rfq = await w.rfq(B, uB, { visibility: 'invited' });
+    const inv = await w.one<{ id: string }>(
+      'insert into rfq_invitations (rfq_id, company_id, invited_company_id, invited_by_user_id) values ($1,$2,$3,$4) returning id',
+      [rfq.id, B, S, uB],
+    );
+    return { buyer: { userId: uB, companyId: B }, supplier: { userId: uS, companyId: S }, id: inv.id, S };
+  }
+  const set = (id: string, status: string) =>
+    `update rfq_invitations set status = '${status}', responded_at = now() where id = '${id}'`;
+  const state = async (id: string) =>
+    (await w.one<{ status: string }>('select status from rfq_invitations where id = $1', [id])).status;
+
+  it('only the invitee moves pending -> viewed -> quoted; the buyer cannot respond on its behalf', async () => {
+    const i = await invitation();
+    for (const to of ['viewed', 'declined', 'quoted']) {
+      expect((await expectDbError(pool, i.buyer, set(i.id, to))).code, `buyer ${to}`).toBe('42501');
+    }
+    expect((await expectDbError(pool, i.supplier, set(i.id, 'quoted'))).code).toBe('42501'); // pending -> quoted
+    await as(pool, i.supplier, (tx) => tx.client.query(set(i.id, 'viewed')));
+    await as(pool, i.supplier, (tx) => tx.client.query(set(i.id, 'quoted')));
+    expect(await state(i.id)).toBe('quoted');
+    expect((await expectDbError(pool, i.supplier, set(i.id, 'declined'))).code).toBe('42501'); // quoted is final
+  });
+
+  it('declined is terminal: nobody can reset it to pending or revive it', async () => {
+    const i = await invitation();
+    await as(pool, i.supplier, (tx) => tx.client.query(set(i.id, 'declined')));
+    for (const to of ['pending', 'viewed', 'quoted']) {
+      expect((await expectDbError(pool, i.supplier, set(i.id, to))).code, `supplier ${to}`).toBe('42501');
+      expect((await expectDbError(pool, i.buyer, set(i.id, to))).code, `buyer ${to}`).toBe('42501');
+    }
+    expect(await state(i.id)).toBe('declined');
+  });
+
+  it('an invitee member without quotation rights cannot respond; system callers can still operate', async () => {
+    const i = await invitation();
+    const viewer = await w.user();
+    await w.member(i.S, viewer, 'viewer');
+    const r = await as(pool, { userId: viewer, companyId: i.S }, (tx) => tx.client.query(set(i.id, 'viewed')));
+    expect(r.rowCount).toBe(0); // RLS hides the row from the update
+    await w.admin.query("update rfq_invitations set status = 'quoted' where id = $1", [i.id]);
+    expect(await state(i.id)).toBe('quoted');
+  });
+});
