@@ -71,7 +71,9 @@ export const sellerTradeProfiles = pgTable(
     check('seller_trade_profiles_type_chk', oneOf(t.sellerType, SELLER_TYPES)),
     check('seller_trade_profiles_validity_chk', sql`${t.defaultQuoteValidityDays} between 1 and 365`),
     check('seller_trade_profiles_published_chk', sql`not ${t.isPublished} or ${t.publishedAt} is not null`),
-    index('ix_seller_trade_profiles_published').on(t.sellerType).where(sql`${t.isPublished}`),
+    index('ix_seller_trade_profiles_published')
+      .on(t.sellerType)
+      .where(sql`${t.isPublished}`),
   ],
 );
 
@@ -157,8 +159,15 @@ export const sellerProductCapabilities = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('seller_product_capabilities_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId], 'cascade'),
-    unique('ux_seller_product_capabilities').on(t.companyId, t.categoryId, t.hsCodeId, t.productId).nullsNotDistinct(),
+    tenantFk(
+      'seller_product_capabilities_product_fk',
+      [t.productId, t.companyId],
+      () => [products.id, products.companyId],
+      'cascade',
+    ),
+    unique('ux_seller_product_capabilities')
+      .on(t.companyId, t.categoryId, t.hsCodeId, t.productId)
+      .nullsNotDistinct(),
     index('ix_seller_product_capabilities_category').on(t.categoryId, t.companyId),
     index('ix_seller_product_capabilities_hs').on(t.hsCodeId, t.companyId),
   ],
@@ -180,7 +189,10 @@ export const sellerTradeTerms = pgTable(
     ...stamps(),
   },
   (t) => [
-    check('seller_trade_terms_mov_chk', sql`${t.minOrderValue} is null or (${t.minOrderValue} >= 0 and ${t.minOrderCurrencyId} is not null)`),
+    check(
+      'seller_trade_terms_mov_chk',
+      sql`${t.minOrderValue} is null or (${t.minOrderValue} >= 0 and ${t.minOrderCurrencyId} is not null)`,
+    ),
   ],
 );
 
@@ -238,9 +250,19 @@ export const sellerCertifications = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('seller_certifications_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
-    unique('ux_seller_certifications').on(t.companyId, t.certificationId, t.certificateNumber).nullsNotDistinct(),
-    check('seller_certifications_dates_chk', sql`${t.validFrom} is null or ${t.validUntil} is null or ${t.validFrom} <= ${t.validUntil}`),
+    tenantFk(
+      'seller_certifications_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
+    unique('ux_seller_certifications')
+      .on(t.companyId, t.certificationId, t.certificateNumber)
+      .nullsNotDistinct(),
+    check(
+      'seller_certifications_dates_chk',
+      sql`${t.validFrom} is null or ${t.validUntil} is null or ${t.validFrom} <= ${t.validUntil}`,
+    ),
     index('ix_seller_certifications_cert').on(t.certificationId, t.companyId),
   ],
 );
@@ -262,10 +284,18 @@ export const sellerCapacityRecords = pgTable(
     ...stamps(),
   },
   (t) => [
-    tenantFk('seller_capacity_records_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId], 'cascade'),
+    tenantFk(
+      'seller_capacity_records_product_fk',
+      [t.productId, t.companyId],
+      () => [products.id, products.companyId],
+      'cascade',
+    ),
     check('seller_capacity_records_qty_chk', sql`${t.capacityQty} > 0`),
     check('seller_capacity_records_period_chk', oneOf(t.period, CAPACITY_PERIODS)),
-    check('seller_capacity_records_scope_chk', sql`${t.categoryId} is not null or ${t.productId} is not null`),
+    check(
+      'seller_capacity_records_scope_chk',
+      sql`${t.categoryId} is not null or ${t.productId} is not null`,
+    ),
     index('ix_seller_capacity_records_company').on(t.companyId),
     index('ix_seller_capacity_records_category').on(t.categoryId),
   ],
@@ -285,7 +315,12 @@ export const sellerMoqRecords = pgTable(
     ...stamps(),
   },
   (t) => [
-    tenantFk('seller_moq_records_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId], 'cascade'),
+    tenantFk(
+      'seller_moq_records_product_fk',
+      [t.productId, t.companyId],
+      () => [products.id, products.companyId],
+      'cascade',
+    ),
     check('seller_moq_records_qty_chk', sql`${t.moqQty} > 0`),
     check('seller_moq_records_scope_chk', sql`${t.categoryId} is not null or ${t.productId} is not null`),
     check('seller_moq_records_value_chk', sql`${t.minOrderValue} is null or ${t.currencyId} is not null`),
@@ -308,8 +343,16 @@ export const sellerLeadTimes = pgTable(
     ...stamps(),
   },
   (t) => [
-    tenantFk('seller_lead_times_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId], 'cascade'),
-    check('seller_lead_times_range_chk', sql`${t.minDays} >= 0 and ${t.minDays} <= ${t.maxDays} and ${t.maxDays} <= 730`),
+    tenantFk(
+      'seller_lead_times_product_fk',
+      [t.productId, t.companyId],
+      () => [products.id, products.companyId],
+      'cascade',
+    ),
+    check(
+      'seller_lead_times_range_chk',
+      sql`${t.minDays} >= 0 and ${t.minDays} <= ${t.maxDays} and ${t.maxDays} <= 730`,
+    ),
     check('seller_lead_times_type_chk', oneOf(t.leadTimeType, LEAD_TIME_TYPES)),
     index('ix_seller_lead_times_company').on(t.companyId),
     index('ix_seller_lead_times_category').on(t.categoryId),
@@ -324,12 +367,21 @@ export const sellerPackagingCapabilities = pgTable(
     notes: text(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ name: 'pk_seller_packaging_capabilities', columns: [t.companyId, t.packagingTypeId] })],
+  (t) => [
+    primaryKey({ name: 'pk_seller_packaging_capabilities', columns: [t.companyId, t.packagingTypeId] }),
+  ],
 );
 
 // ------------------------------------------------------------------ Buyer side
 
-export const BUYER_TYPES = ['importer', 'distributor', 'retailer', 'end_user_manufacturer', 'trader', 'other'] as const;
+export const BUYER_TYPES = [
+  'importer',
+  'distributor',
+  'retailer',
+  'end_user_manufacturer',
+  'trader',
+  'other',
+] as const;
 export const IMPORT_VOLUME_RANGES = ['under_100k', '100k_1m', '1m_10m', 'over_10m'] as const;
 /** Buyer data is private to the buyer company by default (assumption A-7 in ARCHITECTURE_DECISIONS). */
 export const buyerProfiles = pgTable(
@@ -346,7 +398,10 @@ export const buyerProfiles = pgTable(
   },
   (t) => [
     check('buyer_profiles_type_chk', oneOf(t.buyerType, BUYER_TYPES)),
-    check('buyer_profiles_volume_chk', sql`${t.annualImportVolumeUsdRange} is null or ${oneOf(t.annualImportVolumeUsdRange, IMPORT_VOLUME_RANGES)}`),
+    check(
+      'buyer_profiles_volume_chk',
+      sql`${t.annualImportVolumeUsdRange} is null or ${oneOf(t.annualImportVolumeUsdRange, IMPORT_VOLUME_RANGES)}`,
+    ),
   ],
 );
 
@@ -386,7 +441,13 @@ export const buyerTradePreferences = pgTable('buyer_trade_preferences', {
   ...stamps(),
 });
 
-export const IMPORT_REQUIREMENT_TYPES = ['certification', 'document', 'labeling', 'inspection', 'other'] as const;
+export const IMPORT_REQUIREMENT_TYPES = [
+  'certification',
+  'document',
+  'labeling',
+  'inspection',
+  'other',
+] as const;
 export const buyerImportRequirements = pgTable(
   'buyer_import_requirements',
   {

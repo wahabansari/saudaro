@@ -1,5 +1,15 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, integer, pgTable, text, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  pgTable,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { bytea, createdAt, enumText, fk, fkOpt, oneOf, pk, stamps, tenantFk, tstz } from './_helpers.ts';
 import { companies } from './companies.ts';
 import { files } from './documents.ts';
@@ -77,7 +87,9 @@ export const verificationCases = pgTable(
       .on(t.companyId, t.level)
       .where(sql`${t.status} in ('draft','submitted','in_review','needs_info')`),
     index('ix_verification_cases_company').on(t.companyId, t.status),
-    index('ix_verification_cases_queue').on(t.status, t.submittedAt).where(sql`${t.status} in ('submitted','in_review')`),
+    index('ix_verification_cases_queue')
+      .on(t.status, t.submittedAt)
+      .where(sql`${t.status} in ('submitted','in_review')`),
   ],
 );
 
@@ -92,7 +104,9 @@ export const verificationDocuments = pgTable(
     issuerCountryId: fkOpt(() => countries.id),
     issuedAt: tstz(),
     expiresAt: tstz(),
-    reviewStatus: enumText(['pending', 'accepted', 'rejected'] as const).notNull().default('pending'),
+    reviewStatus: enumText(['pending', 'accepted', 'rejected'] as const)
+      .notNull()
+      .default('pending'),
     reviewedByUserId: fkOpt(() => users.id),
     reviewedAt: tstz(),
     reviewNote: text(),
@@ -103,10 +117,17 @@ export const verificationDocuments = pgTable(
       verificationCases.id,
       verificationCases.companyId,
     ]),
-    tenantFk('verification_documents_file_tenant_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
+    tenantFk(
+      'verification_documents_file_tenant_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
     check('verification_documents_review_chk', oneOf(t.reviewStatus, ['pending', 'accepted', 'rejected'])),
     index('ix_verification_documents_case').on(t.caseId),
-    index('ix_verification_documents_expiry').on(t.expiresAt).where(sql`${t.expiresAt} is not null`),
+    index('ix_verification_documents_expiry')
+      .on(t.expiresAt)
+      .where(sql`${t.expiresAt} is not null`),
   ],
 );
 
@@ -118,7 +139,9 @@ export const verificationChecks = pgTable(
     companyId: uuid().notNull(),
     checkType: text().notNull(),
     providerId: fkOpt(() => verificationProviders.id),
-    result: enumText(['pending', 'pass', 'fail', 'inconclusive'] as const).notNull().default('pending'),
+    result: enumText(['pending', 'pass', 'fail', 'inconclusive'] as const)
+      .notNull()
+      .default('pending'),
     externalReference: text(),
     /** Provider payloads can contain PII: encrypted at the application layer, key held outside the DB. */
     detailsCiphertext: bytea(),
@@ -156,8 +179,11 @@ export const verificationStatusHistory = pgTable(
       verificationCases.id,
       verificationCases.companyId,
     ]),
-    check('verification_status_history_actor_chk', oneOf(t.actorType, ['user', 'admin', 'system', 'provider'])),
-    index('ix_verification_status_history_case').on(t.caseId, t.createdAt.desc()),
+    check(
+      'verification_status_history_actor_chk',
+      oneOf(t.actorType, ['user', 'admin', 'system', 'provider']),
+    ),
+    index('ix_verification_status_history_case').on(t.caseId, t.createdAt.desc().nullsFirst()),
   ],
 );
 
@@ -179,13 +205,18 @@ export const companyVerificationLevels = pgTable(
   },
   (t) => [
     unique('ux_company_verification_levels').on(t.companyId, t.level),
-    tenantFk('company_verification_levels_case_tenant_fk', [t.grantedCaseId, t.companyId], () => [
-      verificationCases.id,
-      verificationCases.companyId,
-    ], 'restrict'),
+    tenantFk(
+      'company_verification_levels_case_tenant_fk',
+      [t.grantedCaseId, t.companyId],
+      () => [verificationCases.id, verificationCases.companyId],
+      'restrict',
+    ),
     check('company_verification_levels_level_chk', oneOf(t.level, VERIFICATION_LEVELS)),
     check('company_verification_levels_status_chk', oneOf(t.status, LEVEL_STATUS)),
-    check('company_verification_levels_revoked_chk', sql`(${t.status} = 'revoked') = (${t.revokedAt} is not null)`),
+    check(
+      'company_verification_levels_revoked_chk',
+      sql`(${t.status} = 'revoked') = (${t.revokedAt} is not null)`,
+    ),
     index('ix_company_verification_levels_company').on(t.companyId, t.status),
   ],
 );
@@ -197,7 +228,9 @@ export const complianceFlags = pgTable(
     companyId: fk(() => companies.id),
     flagType: text().notNull(),
     severity: enumText(['low', 'medium', 'high', 'critical'] as const).notNull(),
-    status: enumText(['open', 'under_review', 'resolved', 'dismissed'] as const).notNull().default('open'),
+    status: enumText(['open', 'under_review', 'resolved', 'dismissed'] as const)
+      .notNull()
+      .default('open'),
     raisedByUserId: fkOpt(() => users.id),
     notes: text(),
     resolvedAt: tstz(),
@@ -224,8 +257,11 @@ export const sanctionsScreeningRecords = pgTable(
     nextScreeningDueAt: tstz(),
   },
   (t) => [
-    check('sanctions_screening_result_chk', oneOf(t.result, ['clear', 'potential_match', 'confirmed_match', 'error'])),
-    index('ix_sanctions_screening_company').on(t.companyId, t.screenedAt.desc()),
+    check(
+      'sanctions_screening_result_chk',
+      oneOf(t.result, ['clear', 'potential_match', 'confirmed_match', 'error']),
+    ),
+    index('ix_sanctions_screening_company').on(t.companyId, t.screenedAt.desc().nullsFirst()),
   ],
 );
 
@@ -237,13 +273,20 @@ export const verificationExpiryRecords = pgTable(
     caseId: uuid(),
     verificationDocumentId: fkOpt(() => verificationDocuments.id, 'set null'),
     expiresAt: tstz().notNull(),
-    status: enumText(['upcoming', 'notified', 'expired', 'renewed'] as const).notNull().default('upcoming'),
+    status: enumText(['upcoming', 'notified', 'expired', 'renewed'] as const)
+      .notNull()
+      .default('upcoming'),
     notifiedAt: tstz(),
     createdAt: createdAt(),
   },
   (t) => [
-    check('verification_expiry_records_status_chk', oneOf(t.status, ['upcoming', 'notified', 'expired', 'renewed'])),
-    index('ix_verification_expiry_due').on(t.expiresAt).where(sql`${t.status} in ('upcoming','notified')`),
+    check(
+      'verification_expiry_records_status_chk',
+      oneOf(t.status, ['upcoming', 'notified', 'expired', 'renewed']),
+    ),
+    index('ix_verification_expiry_due')
+      .on(t.expiresAt)
+      .where(sql`${t.status} in ('upcoming','notified')`),
     index('ix_verification_expiry_company').on(t.companyId),
   ],
 );

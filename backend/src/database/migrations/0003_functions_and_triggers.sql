@@ -127,15 +127,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
                  WHERE s.company_id = p_company AND s.is_published AND c.status = 'active')
 $fn$;--> statement-breakpoint
 
-CREATE OR REPLACE FUNCTION app.rfq_owner(p_rfq uuid) RETURNS uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
-  SELECT company_id FROM public.rfqs WHERE id = p_rfq
-$fn$;--> statement-breakpoint
-
 -- Can company p_company SEE rfq p_rfq (published, open, visibility + rules satisfied)? Never a score.
 CREATE OR REPLACE FUNCTION app.can_view_rfq(p_rfq uuid, p_company uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
-  SELECT p_company IS NOT NULL AND EXISTS (
+  -- Oracle hardening: through the runtime role this can only be asked about the caller's own active company.
+  SELECT p_company IS NOT NULL AND (session_user <> 'saudaro_app' OR p_company = app.active_company()) AND EXISTS (
     SELECT 1
     FROM public.rfqs r
     JOIN public.companies c ON c.id = p_company AND c.status = 'active'
@@ -165,13 +161,21 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
      AND EXISTS (SELECT 1 FROM public.rfqs r WHERE r.id = p_rfq AND (r.quote_deadline_at IS NULL OR r.quote_deadline_at > now()))
 $fn$;--> statement-breakpoint
 
+CREATE OR REPLACE FUNCTION app.rfq_owner(p_rfq uuid) RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
+  -- Oracle hardening: the runtime role only learns the owner of an RFQ it owns or is allowed to see.
+  SELECT company_id FROM public.rfqs
+  WHERE id = p_rfq
+    AND (session_user <> 'saudaro_app' OR company_id = app.active_company() OR app.can_view_rfq(id, app.active_company()))
+$fn$;--> statement-breakpoint
+
 CREATE OR REPLACE FUNCTION app.rfq_item_belongs_to_revision(p_item uuid, p_revision uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
   SELECT EXISTS (
     SELECT 1 FROM public.rfq_items i
     JOIN public.quotation_revisions r ON r.id = p_revision
     JOIN public.quotations q ON q.id = r.quotation_id AND q.rfq_id = i.rfq_id
-    WHERE i.id = p_item)
+    WHERE i.id = p_item AND (session_user <> 'saudaro_app' OR r.company_id = app.active_company()))
 $fn$;--> statement-breakpoint
 
 -- Pre-authentication lookup: external identity -> user id. Reveals nothing but the id.
@@ -376,6 +380,9 @@ CREATE TRIGGER trg_company_memberships_guard BEFORE INSERT OR UPDATE ON public.c
 CREATE OR REPLACE FUNCTION app.ensure_company_has_owner() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
 BEGIN
+  -- Serialize concurrent owner removals per company: without this, two owners leaving in separate
+  -- transactions each still see the other as active and the company ends up ownerless.
+  PERFORM 1 FROM public.companies WHERE id = OLD.company_id FOR NO KEY UPDATE;
   IF EXISTS (SELECT 1 FROM public.companies c WHERE c.id = OLD.company_id AND c.status <> 'closed')
      AND NOT EXISTS (
        SELECT 1 FROM public.company_memberships m JOIN public.company_roles r ON r.id = m.role_id
@@ -386,6 +393,24 @@ BEGIN
 END $fn$;--> statement-breakpoint
 CREATE CONSTRAINT TRIGGER trg_company_memberships_owner AFTER UPDATE OR DELETE ON public.company_memberships
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION app.ensure_company_has_owner();--> statement-breakpoint
+
+-- Invitations are a second path into memberships (accept_invitation is a trusted definer function), so the
+-- same hierarchy rule applies at INVITE time: nobody can invite at or above their own level.
+CREATE OR REPLACE FUNCTION app.guard_invitation() RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE v_level int; v_role_company uuid; v_actor_level int;
+BEGIN
+  IF app.is_trusted_caller() THEN RETURN NEW; END IF;
+  SELECT level, company_id INTO v_level, v_role_company FROM public.company_roles WHERE id = NEW.role_id;
+  IF v_level IS NULL OR (v_role_company IS NOT NULL AND v_role_company <> NEW.company_id) THEN
+    RAISE EXCEPTION 'invalid role for this company' USING ERRCODE = '42501'; END IF;
+  v_actor_level := app.role_level(NEW.company_id);
+  IF v_actor_level IS NULL OR v_level >= v_actor_level THEN
+    RAISE EXCEPTION 'cannot invite at or above your own level' USING ERRCODE = '42501'; END IF;
+  NEW.invited_by_user_id := app.uid(); NEW.status := 'pending'; NEW.accepted_by_user_id := NULL; NEW.accepted_at := NULL;
+  RETURN NEW;
+END $fn$;--> statement-breakpoint
+CREATE TRIGGER trg_company_invitations_guard BEFORE INSERT ON public.company_invitations
+  FOR EACH ROW EXECUTE FUNCTION app.guard_invitation();--> statement-breakpoint
 
 -- Role definitions: system roles are immutable; custom roles stay below owner level (CHECK) and
 -- cannot be granted permissions the editing user does not hold themselves.
@@ -452,7 +477,8 @@ END $fn$;--> statement-breakpoint
 CREATE TRIGGER trg_verification_cases_guard BEFORE INSERT OR UPDATE ON public.verification_cases
   FOR EACH ROW EXECUTE FUNCTION app.guard_verification_case();--> statement-breakpoint
 
-CREATE OR REPLACE FUNCTION app.log_verification_status() RETURNS trigger LANGUAGE plpgsql AS $fn$
+CREATE OR REPLACE FUNCTION app.log_verification_status() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
     INSERT INTO public.verification_status_history (case_id, company_id, from_status, to_status, actor_type, actor_user_id, reason)
@@ -572,7 +598,8 @@ BEGIN
 END $fn$;--> statement-breakpoint
 CREATE TRIGGER trg_rfqs_guard BEFORE INSERT OR UPDATE ON public.rfqs FOR EACH ROW EXECUTE FUNCTION app.guard_rfq();--> statement-breakpoint
 
-CREATE OR REPLACE FUNCTION app.log_rfq_status() RETURNS trigger LANGUAGE plpgsql AS $fn$
+CREATE OR REPLACE FUNCTION app.log_rfq_status() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
     INSERT INTO public.rfq_status_history (rfq_id, company_id, from_status, to_status, actor_user_id)
@@ -586,7 +613,7 @@ CREATE OR REPLACE FUNCTION app.guard_rfq_child() RETURNS trigger LANGUAGE plpgsq
 DECLARE v_status text;
 BEGIN
   IF app.is_trusted_caller() THEN RETURN COALESCE(NEW, OLD); END IF;
-  SELECT status INTO v_status FROM public.rfqs WHERE id = COALESCE(NEW.rfq_id, OLD.rfq_id);
+  SELECT status INTO v_status FROM public.rfqs WHERE id = COALESCE(NEW.rfq_id, OLD.rfq_id) FOR SHARE;
   IF v_status IS NULL OR v_status NOT IN ('draft', 'paused') THEN
     RAISE EXCEPTION 'RFQ content is locked (status %)', v_status USING ERRCODE = '42501';
   END IF;
@@ -621,7 +648,7 @@ CREATE TRIGGER trg_rfq_specifications_rfq_lock BEFORE INSERT OR UPDATE OR DELETE
 -- ------------------------------------------------------------------ quotations
 CREATE OR REPLACE FUNCTION app.guard_quotation() RETURNS trigger LANGUAGE plpgsql AS $fn$
 DECLARE
-  v_actor uuid; v_is_supplier boolean; v_is_buyer boolean; v_latest uuid; v_rfq_status text;
+  v_actor uuid; v_is_supplier boolean; v_is_buyer boolean; v_rev record; v_rfq_status text;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF app.is_trusted_caller() THEN RETURN NEW; END IF;
@@ -652,6 +679,10 @@ BEGIN
         RAISE EXCEPTION 'submit the current revision first' USING ERRCODE = '23514'; END IF;
       IF NOT app.can_quote_rfq(OLD.rfq_id, OLD.company_id) THEN
         RAISE EXCEPTION 'this RFQ is no longer open for quotations' USING ERRCODE = '42501'; END IF;
+      -- Commercial headline figures are DERIVED from the submitted revision, never client-supplied.
+      SELECT total_amount, currency_id, valid_until INTO v_rev FROM public.quotation_revisions
+        WHERE quotation_id = OLD.id AND revision_no = OLD.current_revision_no;
+      NEW.total_amount := v_rev.total_amount; NEW.currency_id := v_rev.currency_id; NEW.valid_until := v_rev.valid_until;
       NEW.submitted_at := now();
     ELSIF v_is_supplier AND NEW.status = 'withdrawn' AND OLD.status IN ('draft', 'submitted', 'under_negotiation') THEN
       NEW.closed_at := now();
@@ -666,10 +697,12 @@ BEGIN
         RAISE EXCEPTION 'the RFQ is not open for acceptance (status %)', v_rfq_status USING ERRCODE = '42501'; END IF;
       IF OLD.valid_until IS NOT NULL AND OLD.valid_until <= now() THEN
         RAISE EXCEPTION 'the quotation validity has expired' USING ERRCODE = '42501'; END IF;
-      SELECT r.id INTO v_latest FROM public.quotation_revisions r
+      SELECT r.id, r.revision_no, r.total_amount, r.currency_id, r.valid_until INTO v_rev FROM public.quotation_revisions r
         WHERE r.quotation_id = OLD.id AND r.status = 'submitted' ORDER BY r.revision_no DESC LIMIT 1;
-      IF v_latest IS NULL OR NEW.accepted_revision_id IS DISTINCT FROM v_latest THEN
+      IF v_rev.id IS NULL OR NEW.accepted_revision_id IS DISTINCT FROM v_rev.id OR v_rev.revision_no <> OLD.current_revision_no THEN
         RAISE EXCEPTION 'only the latest submitted revision can be accepted' USING ERRCODE = '23514'; END IF;
+      -- The accepted figures are exactly the accepted revision's.
+      NEW.total_amount := v_rev.total_amount; NEW.currency_id := v_rev.currency_id; NEW.valid_until := v_rev.valid_until;
       NEW.accepted_at := now(); NEW.closed_at := now();
     ELSE
       RAISE EXCEPTION 'illegal quotation transition % -> % for this party', OLD.status, NEW.status USING ERRCODE = '42501';
@@ -685,6 +718,9 @@ BEGIN
         IF NEW.current_revision_no <> OLD.current_revision_no + 1 OR NOT EXISTS (
              SELECT 1 FROM public.quotation_revisions r WHERE r.quotation_id = OLD.id AND r.revision_no = NEW.current_revision_no AND r.status = 'submitted') THEN
           RAISE EXCEPTION 'commercial terms of a live quotation change only through a submitted revision' USING ERRCODE = '42501'; END IF;
+        SELECT total_amount, currency_id, valid_until INTO v_rev FROM public.quotation_revisions
+          WHERE quotation_id = OLD.id AND revision_no = NEW.current_revision_no;
+        NEW.total_amount := v_rev.total_amount; NEW.currency_id := v_rev.currency_id; NEW.valid_until := v_rev.valid_until;
       END IF;
     END IF;
   END IF;
@@ -692,7 +728,8 @@ BEGIN
 END $fn$;--> statement-breakpoint
 CREATE TRIGGER trg_quotations_guard BEFORE INSERT OR UPDATE ON public.quotations FOR EACH ROW EXECUTE FUNCTION app.guard_quotation();--> statement-breakpoint
 
-CREATE OR REPLACE FUNCTION app.log_quotation_status() RETURNS trigger LANGUAGE plpgsql AS $fn$
+CREATE OR REPLACE FUNCTION app.log_quotation_status() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
     INSERT INTO public.quotation_status_history (quotation_id, company_id, from_status, to_status, actor_company_id, actor_user_id)
@@ -727,6 +764,9 @@ BEGIN
   IF NEW.quotation_id <> OLD.quotation_id OR NEW.revision_no <> OLD.revision_no OR NEW.company_id <> OLD.company_id THEN
     RAISE EXCEPTION 'immutable revision column' USING ERRCODE = '42501'; END IF;
   IF NEW.status = 'submitted' THEN
+    SELECT status INTO v_qstatus FROM public.quotations WHERE id = OLD.quotation_id;
+    IF v_qstatus IS NULL OR v_qstatus NOT IN ('draft', 'submitted', 'under_negotiation') THEN
+      RAISE EXCEPTION 'quotation is closed; its draft revision can no longer be submitted' USING ERRCODE = '42501'; END IF;
     IF NOT EXISTS (SELECT 1 FROM public.quotation_items WHERE revision_id = OLD.id) THEN
       RAISE EXCEPTION 'a revision needs at least one item' USING ERRCODE = '23514'; END IF;
     SELECT COALESCE(sum(total_price), 0) INTO v_total FROM public.quotation_items WHERE revision_id = OLD.id;
@@ -741,7 +781,8 @@ CREATE OR REPLACE FUNCTION app.guard_revision_child() RETURNS trigger LANGUAGE p
 DECLARE v_status text;
 BEGIN
   IF app.is_trusted_caller() THEN RETURN COALESCE(NEW, OLD); END IF;
-  SELECT status INTO v_status FROM public.quotation_revisions WHERE id = COALESCE(NEW.revision_id, OLD.revision_id);
+  -- FOR SHARE: a concurrent "submit revision" (which needs the row exclusively) cannot slip past an insert.
+  SELECT status INTO v_status FROM public.quotation_revisions WHERE id = COALESCE(NEW.revision_id, OLD.revision_id) FOR SHARE;
   IF v_status IS DISTINCT FROM 'draft' THEN
     RAISE EXCEPTION 'submitted revisions are immutable' USING ERRCODE = '42501'; END IF;
   IF TG_TABLE_NAME = 'quotation_items' AND TG_OP <> 'DELETE'
@@ -788,6 +829,10 @@ BEGIN
     IF NEW.accepted_revision_id <> q.accepted_revision_id OR NEW.rfq_id <> q.rfq_id OR NEW.currency_id <> q.currency_id
        OR NEW.total_amount <> q.total_amount OR NEW.supplier_company_id <> q.company_id OR NEW.buyer_company_id <> q.buyer_company_id THEN
       RAISE EXCEPTION 'deal does not match the accepted quotation snapshot' USING ERRCODE = '23514'; END IF;
+    -- The agreed figures must equal the ACCEPTED REVISION itself (not just the quotation's headline columns).
+    IF NOT EXISTS (SELECT 1 FROM public.quotation_revisions r
+                   WHERE r.id = NEW.accepted_revision_id AND r.total_amount = NEW.total_amount AND r.currency_id = NEW.currency_id) THEN
+      RAISE EXCEPTION 'deal total/currency must equal the accepted revision' USING ERRCODE = '23514'; END IF;
     NEW.status := 'active'; NEW.agreed_at := now();
     RETURN NEW;
   END IF;
@@ -820,7 +865,8 @@ BEGIN
 END $fn$;--> statement-breakpoint
 CREATE TRIGGER trg_deals_guard BEFORE INSERT OR UPDATE ON public.deals FOR EACH ROW EXECUTE FUNCTION app.guard_deal();--> statement-breakpoint
 
-CREATE OR REPLACE FUNCTION app.log_deal_status() RETURNS trigger LANGUAGE plpgsql AS $fn$
+CREATE OR REPLACE FUNCTION app.log_deal_status() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $fn$
 BEGIN
   IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
     INSERT INTO public.deal_status_history (deal_id, from_status, to_status, actor_company_id, actor_user_id)
@@ -848,6 +894,23 @@ BEGIN
   IF app.is_trusted_caller() THEN RETURN NULL; END IF;
   IF NOT EXISTS (SELECT 1 FROM public.deal_terms WHERE deal_id = NEW.id) THEN
     RAISE EXCEPTION 'deal is missing its terms snapshot' USING ERRCODE = '23514'; END IF;
+  -- Agreed terms must equal the accepted revision's terms (a revision without a terms row means "no terms").
+  IF NOT EXISTS (
+       SELECT 1 FROM public.deal_terms dt
+       LEFT JOIN public.quotation_terms qt ON qt.revision_id = NEW.accepted_revision_id
+       WHERE dt.deal_id = NEW.id
+         AND dt.incoterm_id IS NOT DISTINCT FROM qt.incoterm_id
+         AND dt.incoterm_named_place IS NOT DISTINCT FROM qt.incoterm_named_place
+         AND dt.port_of_loading_id IS NOT DISTINCT FROM qt.port_of_loading_id
+         AND dt.delivery_place IS NOT DISTINCT FROM qt.delivery_place
+         AND dt.payment_term_id IS NOT DISTINCT FROM qt.payment_term_id
+         AND dt.payment_term_notes IS NOT DISTINCT FROM qt.payment_term_notes
+         AND dt.packaging_type_id IS NOT DISTINCT FROM qt.packaging_type_id
+         AND dt.shipment_mode_id IS NOT DISTINCT FROM qt.shipment_mode_id
+         AND dt.warranty_terms IS NOT DISTINCT FROM qt.warranty_terms) THEN
+    RAISE EXCEPTION 'deal terms do not match the accepted revision terms' USING ERRCODE = '23514'; END IF;
+  IF (SELECT COALESCE(sum(total_price), 0) FROM public.deal_items WHERE deal_id = NEW.id) <> NEW.total_amount THEN
+    RAISE EXCEPTION 'deal items do not add up to the agreed total' USING ERRCODE = '23514'; END IF;
   IF (SELECT count(*) FROM public.deal_parties WHERE deal_id = NEW.id AND
         ((party_role = 'buyer' AND company_id = NEW.buyer_company_id) OR (party_role = 'seller' AND company_id = NEW.supplier_company_id))) <> 2 THEN
     RAISE EXCEPTION 'deal must list exactly its buyer and seller parties' USING ERRCODE = '23514'; END IF;
@@ -892,7 +955,9 @@ BEGIN
     END IF;
     RETURN NEW;
   END IF;
-  IF NEW.status <> OLD.status OR OLD.status <> 'pending' OR OLD.reviewer_company_id <> app.active_company() THEN
+  IF NEW.status <> OLD.status OR OLD.status <> 'pending' OR OLD.reviewer_company_id <> app.active_company()
+     OR NEW.moderation_note IS DISTINCT FROM OLD.moderation_note OR NEW.moderated_at IS DISTINCT FROM OLD.moderated_at
+     OR NEW.moderated_by_user_id IS DISTINCT FROM OLD.moderated_by_user_id OR NEW.reviewer_user_id <> OLD.reviewer_user_id THEN
     RAISE EXCEPTION 'reviews can only be edited by their author while pending' USING ERRCODE = '42501'; END IF;
   RETURN NEW;
 END $fn$;--> statement-breakpoint
@@ -949,7 +1014,75 @@ BEGIN
      OR NEW.sender_company_id IS DISTINCT FROM OLD.sender_company_id OR NEW.kind <> OLD.kind
      OR NEW.created_at <> OLD.created_at OR NEW.moderation_status <> OLD.moderation_status THEN
     RAISE EXCEPTION 'immutable message column' USING ERRCODE = '42501'; END IF;
-  IF NEW.body IS DISTINCT FROM OLD.body THEN NEW.edited_at := now(); END IF;
+  IF NEW.body IS DISTINCT FROM OLD.body THEN
+    -- Negotiation history must not be rewritable after the counterparty could have relied on it.
+    IF now() - OLD.created_at > interval '15 minutes' OR EXISTS (
+         SELECT 1 FROM public.message_read_receipts r WHERE r.message_id = OLD.id AND r.user_id <> OLD.sender_user_id) THEN
+      RAISE EXCEPTION 'a sent message can no longer be edited' USING ERRCODE = '42501'; END IF;
+    NEW.edited_at := now();
+  END IF;
   RETURN NEW;
 END $fn$;--> statement-breakpoint
-CREATE TRIGGER trg_messages_guard BEFORE INSERT OR UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION app.guard_message();
+CREATE TRIGGER trg_messages_guard BEFORE INSERT OR UPDATE ON public.messages FOR EACH ROW EXECUTE FUNCTION app.guard_message();--> statement-breakpoint
+
+-- ------------------------------------------------------------------ security-review hardening
+-- Deal cancellation: only the two deal parties; a request starts as 'requested'; ONLY the counterparty
+-- (never the requester) can accept/reject; the requester can only withdraw.
+CREATE OR REPLACE FUNCTION app.guard_deal_cancellation() RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE d record; v_actor uuid;
+BEGIN
+  IF app.is_system_caller() THEN RETURN NEW; END IF;
+  v_actor := app.active_company();
+  SELECT buyer_company_id, supplier_company_id INTO d FROM public.deals WHERE id = NEW.deal_id;
+  IF NOT FOUND OR v_actor IS NULL OR v_actor NOT IN (d.buyer_company_id, d.supplier_company_id) THEN
+    RAISE EXCEPTION 'only the buyer or supplier of the deal can manage its cancellation' USING ERRCODE = '42501'; END IF;
+  IF TG_OP = 'INSERT' THEN
+    NEW.status := 'requested'; NEW.requested_by_company_id := v_actor;
+    NEW.responded_by_company_id := NULL; NEW.responded_at := NULL;
+    RETURN NEW;
+  END IF;
+  IF NEW.deal_id <> OLD.deal_id OR NEW.requested_by_company_id <> OLD.requested_by_company_id
+     OR NEW.requested_by_user_id <> OLD.requested_by_user_id OR NEW.reason <> OLD.reason THEN
+    RAISE EXCEPTION 'immutable cancellation column' USING ERRCODE = '42501'; END IF;
+  IF OLD.status <> 'requested' THEN RAISE EXCEPTION 'cancellation request is final' USING ERRCODE = '42501'; END IF;
+  IF NEW.status = 'withdrawn' THEN
+    IF v_actor <> OLD.requested_by_company_id THEN
+      RAISE EXCEPTION 'only the requester can withdraw' USING ERRCODE = '42501'; END IF;
+    NEW.responded_by_company_id := NULL; NEW.responded_at := NULL;
+  ELSIF NEW.status IN ('accepted', 'rejected') THEN
+    IF v_actor = OLD.requested_by_company_id THEN
+      RAISE EXCEPTION 'the counterparty must respond to a cancellation request' USING ERRCODE = '42501'; END IF;
+    NEW.responded_by_company_id := v_actor; NEW.responded_at := now();
+  ELSE
+    RAISE EXCEPTION 'illegal cancellation status %', NEW.status USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $fn$;--> statement-breakpoint
+CREATE TRIGGER trg_deal_cancellations_guard BEFORE INSERT OR UPDATE ON public.deal_cancellations
+  FOR EACH ROW EXECUTE FUNCTION app.guard_deal_cancellation();--> statement-breakpoint
+
+-- Deal parties are fixed at deal creation (buyer + seller). Nobody can plant a third company afterwards.
+CREATE TRIGGER trg_deal_parties_snapshot BEFORE INSERT ON public.deal_parties
+  FOR EACH ROW EXECUTE FUNCTION app.guard_deal_snapshot_write();--> statement-breakpoint
+
+-- Custom role definitions: a role manager can never define, modify or raise a role to or above their own level
+-- (otherwise: create low role, assign accomplice, raise role -> accomplice outranks the creator).
+CREATE OR REPLACE FUNCTION app.guard_company_role() RETURNS trigger LANGUAGE plpgsql AS $fn$
+DECLARE v_actor_level int;
+BEGIN
+  IF app.is_trusted_caller() THEN RETURN NEW; END IF;
+  v_actor_level := app.role_level(NEW.company_id);
+  IF NEW.company_id IS NULL OR v_actor_level IS NULL THEN
+    RAISE EXCEPTION 'not allowed to define roles here' USING ERRCODE = '42501'; END IF;
+  IF NEW.level >= v_actor_level THEN
+    RAISE EXCEPTION 'cannot define a role at or above your own level' USING ERRCODE = '42501'; END IF;
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.company_id IS DISTINCT FROM OLD.company_id OR NEW.key <> OLD.key OR NEW.is_system <> OLD.is_system THEN
+      RAISE EXCEPTION 'immutable role column' USING ERRCODE = '42501'; END IF;
+    IF OLD.level >= v_actor_level THEN
+      RAISE EXCEPTION 'cannot modify a role at or above your own level' USING ERRCODE = '42501'; END IF;
+  END IF;
+  RETURN NEW;
+END $fn$;--> statement-breakpoint
+CREATE TRIGGER trg_company_roles_guard BEFORE INSERT OR UPDATE ON public.company_roles
+  FOR EACH ROW EXECUTE FUNCTION app.guard_company_role();

@@ -63,9 +63,16 @@ export const productSpecificationDefinitions = pgTable(
       'spec_definitions_enum_chk',
       sql`(${t.dataType} = 'enum') = (${t.allowedValues} is not null and cardinality(${t.allowedValues}) > 0)`,
     ),
-    check('spec_definitions_bounds_chk', sql`${t.minValue} is null or ${t.maxValue} is null or ${t.minValue} <= ${t.maxValue}`),
-    uniqueIndex('ux_spec_definitions_global_key').on(t.key).where(sql`${t.categoryId} is null`),
-    uniqueIndex('ux_spec_definitions_category_key').on(t.categoryId, t.key).where(sql`${t.categoryId} is not null`),
+    check(
+      'spec_definitions_bounds_chk',
+      sql`${t.minValue} is null or ${t.maxValue} is null or ${t.minValue} <= ${t.maxValue}`,
+    ),
+    uniqueIndex('ux_spec_definitions_global_key')
+      .on(t.key)
+      .where(sql`${t.categoryId} is null`),
+    uniqueIndex('ux_spec_definitions_category_key')
+      .on(t.categoryId, t.key)
+      .where(sql`${t.categoryId} is not null`),
   ],
 );
 
@@ -99,9 +106,13 @@ export const products = pgTable(
     unique('ux_products_company_slug').on(t.companyId, t.slug),
     check('products_status_chk', oneOf(t.status, PRODUCT_STATUS)),
     check('products_published_chk', sql`${t.status} <> 'active' or ${t.publishedAt} is not null`),
-    index('ix_products_company_status').on(t.companyId, t.status, t.createdAt.desc()),
-    index('ix_products_category_active').on(t.primaryCategoryId, t.publishedAt.desc()).where(sql`${t.status} = 'active'`),
-    index('ix_products_origin_active').on(t.originCountryId).where(sql`${t.status} = 'active'`),
+    index('ix_products_company_status').on(t.companyId, t.status, t.createdAt.desc().nullsFirst()),
+    index('ix_products_category_active')
+      .on(t.primaryCategoryId, t.publishedAt.desc().nullsFirst())
+      .where(sql`${t.status} = 'active'`),
+    index('ix_products_origin_active')
+      .on(t.originCountryId)
+      .where(sql`${t.status} = 'active'`),
   ],
 );
 
@@ -115,7 +126,10 @@ export const productCategoriesMapping = pgTable(
   },
   (t) => [
     primaryKey({ name: 'pk_product_categories_mapping', columns: [t.productId, t.categoryId] }),
-    tenantFk('product_categories_mapping_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
+    tenantFk('product_categories_mapping_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
     index('ix_product_categories_mapping_category').on(t.categoryId),
   ],
 );
@@ -133,14 +147,31 @@ export const productImages = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('product_images_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
-    tenantFk('product_images_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
+    tenantFk('product_images_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
+    tenantFk(
+      'product_images_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
     index('ix_product_images_product').on(t.productId, t.sortOrder),
-    uniqueIndex('ux_product_images_primary').on(t.productId).where(sql`${t.isPrimary}`),
+    uniqueIndex('ux_product_images_primary')
+      .on(t.productId)
+      .where(sql`${t.isPrimary}`),
   ],
 );
 
-export const PRODUCT_DOCUMENT_TYPES = ['datasheet', 'catalog', 'test_report', 'certificate', 'msds', 'other'] as const;
+export const PRODUCT_DOCUMENT_TYPES = [
+  'datasheet',
+  'catalog',
+  'test_report',
+  'certificate',
+  'msds',
+  'other',
+] as const;
 export const productDocuments = pgTable(
   'product_documents',
   {
@@ -153,8 +184,16 @@ export const productDocuments = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('product_documents_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
-    tenantFk('product_documents_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
+    tenantFk('product_documents_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
+    tenantFk(
+      'product_documents_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
     check('product_documents_type_chk', oneOf(t.documentType, PRODUCT_DOCUMENT_TYPES)),
     index('ix_product_documents_product').on(t.productId),
   ],
@@ -176,14 +215,20 @@ export const productSpecifications = pgTable(
     ...stamps(),
   },
   (t) => [
-    tenantFk('product_specifications_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
+    tenantFk('product_specifications_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
     unique('ux_product_specifications').on(t.productId, t.definitionId),
     // Shape check; the value-vs-definition type match is enforced by trigger app.validate_spec_value().
     check(
       'product_specifications_one_shape_chk',
       sql`(${t.valueText} is not null)::int + (${t.valueNumber} is not null)::int + (${t.valueBoolean} is not null)::int + (${t.valueMin} is not null or ${t.valueMax} is not null)::int = 1`,
     ),
-    check('product_specifications_range_chk', sql`${t.valueMin} is null or ${t.valueMax} is null or ${t.valueMin} <= ${t.valueMax}`),
+    check(
+      'product_specifications_range_chk',
+      sql`${t.valueMin} is null or ${t.valueMax} is null or ${t.valueMin} <= ${t.valueMax}`,
+    ),
     index('ix_product_specifications_definition_number').on(t.definitionId, t.valueNumber),
     index('ix_product_specifications_definition_text').on(t.definitionId, t.valueText),
   ],
@@ -204,9 +249,20 @@ export const productCertifications = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('product_certifications_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
-    tenantFk('product_certifications_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
-    check('product_certifications_dates_chk', sql`${t.validFrom} is null or ${t.validUntil} is null or ${t.validFrom} <= ${t.validUntil}`),
+    tenantFk('product_certifications_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
+    tenantFk(
+      'product_certifications_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
+    check(
+      'product_certifications_dates_chk',
+      sql`${t.validFrom} is null or ${t.validUntil} is null or ${t.validFrom} <= ${t.validUntil}`,
+    ),
     index('ix_product_certifications_product').on(t.productId),
     index('ix_product_certifications_cert').on(t.certificationId),
   ],
@@ -222,7 +278,10 @@ export const productHsCodes = pgTable(
   },
   (t) => [
     primaryKey({ name: 'pk_product_hs_codes', columns: [t.productId, t.hsCodeId] }),
-    tenantFk('product_hs_codes_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
+    tenantFk('product_hs_codes_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
     index('ix_product_hs_codes_hs').on(t.hsCodeId),
   ],
 );
@@ -251,16 +310,36 @@ export const sellerProductListings = pgTable(
     ...stamps(),
   },
   (t) => [
-    tenantFk('seller_product_listings_product_fk', [t.productId, t.companyId], () => [products.id, products.companyId]),
+    tenantFk('seller_product_listings_product_fk', [t.productId, t.companyId], () => [
+      products.id,
+      products.companyId,
+    ]),
     unique('ux_seller_product_listings_id_company').on(t.id, t.companyId),
     check('seller_product_listings_status_chk', oneOf(t.status, LISTING_STATUS)),
-    check('seller_product_listings_price_chk', sql`${t.priceMin} is null or ${t.priceMax} is null or ${t.priceMin} <= ${t.priceMax}`),
-    check('seller_product_listings_price_currency_chk', sql`(${t.priceMin} is null and ${t.priceMax} is null) or ${t.currencyId} is not null`),
-    check('seller_product_listings_moq_chk', sql`${t.minOrderQty} is null or (${t.minOrderQty} > 0 and ${t.moqUomId} is not null)`),
-    check('seller_product_listings_lead_chk', sql`${t.leadTimeDaysMin} is null or ${t.leadTimeDaysMax} is null or ${t.leadTimeDaysMin} <= ${t.leadTimeDaysMax}`),
-    check('seller_product_listings_nonneg_chk', sql`coalesce(${t.priceMin}, 0) >= 0 and coalesce(${t.monthlyCapacity}, 0) >= 0`),
-    index('ix_seller_product_listings_company').on(t.companyId, t.status, t.createdAt.desc()),
+    check(
+      'seller_product_listings_price_chk',
+      sql`${t.priceMin} is null or ${t.priceMax} is null or ${t.priceMin} <= ${t.priceMax}`,
+    ),
+    check(
+      'seller_product_listings_price_currency_chk',
+      sql`(${t.priceMin} is null and ${t.priceMax} is null) or ${t.currencyId} is not null`,
+    ),
+    check(
+      'seller_product_listings_moq_chk',
+      sql`${t.minOrderQty} is null or (${t.minOrderQty} > 0 and ${t.moqUomId} is not null)`,
+    ),
+    check(
+      'seller_product_listings_lead_chk',
+      sql`${t.leadTimeDaysMin} is null or ${t.leadTimeDaysMax} is null or ${t.leadTimeDaysMin} <= ${t.leadTimeDaysMax}`,
+    ),
+    check(
+      'seller_product_listings_nonneg_chk',
+      sql`coalesce(${t.priceMin}, 0) >= 0 and coalesce(${t.monthlyCapacity}, 0) >= 0`,
+    ),
+    index('ix_seller_product_listings_company').on(t.companyId, t.status, t.createdAt.desc().nullsFirst()),
     index('ix_seller_product_listings_product').on(t.productId),
-    index('ix_seller_product_listings_active').on(t.status, t.validUntil).where(sql`${t.status} = 'active'`),
+    index('ix_seller_product_listings_active')
+      .on(t.status, t.validUntil)
+      .where(sql`${t.status} = 'active'`),
   ],
 );

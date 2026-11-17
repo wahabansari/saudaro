@@ -4,6 +4,12 @@
 --
 -- Model: every table has RLS enabled; every table except pure reference data has FORCE RLS (the
 -- owner role is subject to it too). The runtime role (saudaro_app) has only the privileges listed.
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA app FROM PUBLIC;
+--> statement-breakpoint
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO saudaro_app, saudaro_worker, saudaro_pub, saudaro_authz;
+--> statement-breakpoint
+REVOKE EXECUTE ON FUNCTION app.resolve_identity(text, text) FROM saudaro_app;
+--> statement-breakpoint
 GRANT CREATE ON SCHEMA app TO saudaro_authz, saudaro_pub;
 --> statement-breakpoint
 DO $do$
@@ -15,14 +21,12 @@ BEGIN
 END
 $do$;
 --> statement-breakpoint
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO saudaro_app, saudaro_worker, saudaro_pub, saudaro_authz;
---> statement-breakpoint
 CREATE VIEW app.public_rfqs WITH (security_barrier = true) AS
 SELECT r.id, r.reference_no, r.company_id AS buyer_company_id, r.title, r.description, r.primary_category_id,
        r.status, r.currency_id, r.allow_partial_quotes, r.quote_deadline_at, r.published_at, r.expires_at
 FROM public.rfqs r
-WHERE (r.status = 'published' AND r.expires_at > now() AND app.can_view_rfq(r.id, app.active_company()))
-   OR EXISTS (SELECT 1 FROM public.quotations q WHERE q.rfq_id = r.id AND q.company_id = app.active_company());
+WHERE (r.status = 'published' AND r.expires_at > now() AND app.can_view_rfq(r.id, (select app.active_company())))
+   OR EXISTS (SELECT 1 FROM public.quotations q WHERE q.rfq_id = r.id AND q.company_id = (select app.active_company()));
 --> statement-breakpoint
 GRANT SELECT ON app.public_rfqs TO saudaro_app, saudaro_worker, saudaro_pub;
 --> statement-breakpoint
@@ -531,7 +535,7 @@ CREATE POLICY company_reviews_app_insert ON public.company_reviews FOR INSERT TO
 --> statement-breakpoint
 CREATE POLICY company_reviews_app_update ON public.company_reviews FOR UPDATE TO saudaro_app USING ((reviewer_company_id = (select app.writable_company()) AND (select app.can_write('review.write'))) OR (select app.is_platform_admin('moderator'))) WITH CHECK ((reviewer_company_id = (select app.writable_company()) AND (select app.can_write('review.write'))) OR (select app.is_platform_admin('moderator')));
 --> statement-breakpoint
-GRANT UPDATE ON public.company_reviews TO saudaro_app;
+GRANT UPDATE (rating, title, body, status) ON public.company_reviews TO saudaro_app;
 --> statement-breakpoint
 GRANT SELECT, INSERT ON public.company_reviews TO saudaro_app;
 --> statement-breakpoint
@@ -903,13 +907,15 @@ REVOKE ALL ON public.deal_status_history FROM PUBLIC, saudaro_app, saudaro_worke
 --> statement-breakpoint
 CREATE POLICY deal_status_history_app_select ON public.deal_status_history FOR SELECT TO saudaro_app USING (deal_id in (select id from public.deals));
 --> statement-breakpoint
-CREATE POLICY deal_status_history_app_insert ON public.deal_status_history FOR INSERT TO saudaro_app WITH CHECK (deal_id in (select id from public.deals));
---> statement-breakpoint
-GRANT SELECT, INSERT ON public.deal_status_history TO saudaro_app;
+GRANT SELECT ON public.deal_status_history TO saudaro_app;
 --> statement-breakpoint
 CREATE POLICY deal_status_history_worker_select ON public.deal_status_history FOR SELECT TO saudaro_worker USING (true);
 --> statement-breakpoint
 GRANT SELECT ON public.deal_status_history TO saudaro_worker;
+--> statement-breakpoint
+CREATE POLICY deal_status_history_authz_insert ON public.deal_status_history FOR INSERT TO saudaro_authz WITH CHECK (true);
+--> statement-breakpoint
+GRANT INSERT ON public.deal_status_history TO saudaro_authz;
 --> statement-breakpoint
 ALTER TABLE public.deal_terms ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
@@ -1125,7 +1131,7 @@ REVOKE ALL ON public.message_attachments FROM PUBLIC, saudaro_app, saudaro_worke
 --> statement-breakpoint
 CREATE POLICY message_attachments_app_select ON public.message_attachments FOR SELECT TO saudaro_app USING (message_id in (select id from public.messages));
 --> statement-breakpoint
-CREATE POLICY message_attachments_app_insert ON public.message_attachments FOR INSERT TO saudaro_app WITH CHECK (message_id in (select id from public.messages where sender_user_id = (select app.uid())));
+CREATE POLICY message_attachments_app_insert ON public.message_attachments FOR INSERT TO saudaro_app WITH CHECK (company_id = (select app.writable_company()) AND message_id in (select id from public.messages where sender_user_id = (select app.uid())));
 --> statement-breakpoint
 GRANT SELECT, INSERT ON public.message_attachments TO saudaro_app;
 --> statement-breakpoint
@@ -1729,9 +1735,7 @@ REVOKE ALL ON public.quotation_status_history FROM PUBLIC, saudaro_app, saudaro_
 --> statement-breakpoint
 CREATE POLICY quotation_status_history_app_select ON public.quotation_status_history FOR SELECT TO saudaro_app USING (quotation_id in (select id from public.quotations));
 --> statement-breakpoint
-CREATE POLICY quotation_status_history_app_insert ON public.quotation_status_history FOR INSERT TO saudaro_app WITH CHECK (actor_company_id = (select app.active_company()) AND quotation_id in (select id from public.quotations));
---> statement-breakpoint
-GRANT SELECT, INSERT ON public.quotation_status_history TO saudaro_app;
+GRANT SELECT ON public.quotation_status_history TO saudaro_app;
 --> statement-breakpoint
 CREATE POLICY quotation_status_history_worker_select ON public.quotation_status_history FOR SELECT TO saudaro_worker USING (true);
 --> statement-breakpoint
@@ -1740,6 +1744,10 @@ GRANT SELECT ON public.quotation_status_history TO saudaro_worker;
 CREATE POLICY quotation_status_history_worker_insert ON public.quotation_status_history FOR INSERT TO saudaro_worker WITH CHECK (true);
 --> statement-breakpoint
 GRANT INSERT ON public.quotation_status_history TO saudaro_worker;
+--> statement-breakpoint
+CREATE POLICY quotation_status_history_authz_insert ON public.quotation_status_history FOR INSERT TO saudaro_authz WITH CHECK (true);
+--> statement-breakpoint
+GRANT INSERT ON public.quotation_status_history TO saudaro_authz;
 --> statement-breakpoint
 ALTER TABLE public.quotation_terms ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
@@ -2115,13 +2123,15 @@ REVOKE ALL ON public.rfq_status_history FROM PUBLIC, saudaro_app, saudaro_worker
 --> statement-breakpoint
 CREATE POLICY rfq_status_history_app_select ON public.rfq_status_history FOR SELECT TO saudaro_app USING (company_id = (select app.active_company()));
 --> statement-breakpoint
-CREATE POLICY rfq_status_history_app_insert ON public.rfq_status_history FOR INSERT TO saudaro_app WITH CHECK (company_id = (select app.active_company()));
---> statement-breakpoint
-GRANT SELECT, INSERT ON public.rfq_status_history TO saudaro_app;
+GRANT SELECT ON public.rfq_status_history TO saudaro_app;
 --> statement-breakpoint
 CREATE POLICY rfq_status_history_worker_select ON public.rfq_status_history FOR SELECT TO saudaro_worker USING (true);
 --> statement-breakpoint
 GRANT SELECT ON public.rfq_status_history TO saudaro_worker;
+--> statement-breakpoint
+CREATE POLICY rfq_status_history_authz_insert ON public.rfq_status_history FOR INSERT TO saudaro_authz WITH CHECK (true);
+--> statement-breakpoint
+GRANT INSERT ON public.rfq_status_history TO saudaro_authz;
 --> statement-breakpoint
 ALTER TABLE public.rfq_supplier_matches ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
@@ -2223,9 +2233,7 @@ CREATE POLICY rfqs_app_update ON public.rfqs FOR UPDATE TO saudaro_app USING (co
 --> statement-breakpoint
 GRANT UPDATE ON public.rfqs TO saudaro_app;
 --> statement-breakpoint
-CREATE POLICY rfqs_app_delete ON public.rfqs FOR DELETE TO saudaro_app USING (company_id = (select app.writable_company()) AND (select app.can_write('rfq.manage')) AND status = 'draft');
---> statement-breakpoint
-GRANT SELECT, INSERT, DELETE ON public.rfqs TO saudaro_app;
+GRANT SELECT, INSERT ON public.rfqs TO saudaro_app;
 --> statement-breakpoint
 CREATE POLICY rfqs_worker_select ON public.rfqs FOR SELECT TO saudaro_worker USING (true);
 --> statement-breakpoint
@@ -2991,9 +2999,7 @@ REVOKE ALL ON public.verification_status_history FROM PUBLIC, saudaro_app, sauda
 --> statement-breakpoint
 CREATE POLICY verification_status_history_app_select ON public.verification_status_history FOR SELECT TO saudaro_app USING (company_id = (select app.active_company()) OR (select app.is_platform_admin('verification_officer')));
 --> statement-breakpoint
-CREATE POLICY verification_status_history_app_insert ON public.verification_status_history FOR INSERT TO saudaro_app WITH CHECK (company_id = (select app.active_company()) OR (select app.is_platform_admin('verification_officer')));
---> statement-breakpoint
-GRANT SELECT, INSERT ON public.verification_status_history TO saudaro_app;
+GRANT SELECT ON public.verification_status_history TO saudaro_app;
 --> statement-breakpoint
 CREATE POLICY verification_status_history_worker_select ON public.verification_status_history FOR SELECT TO saudaro_worker USING (true);
 --> statement-breakpoint
@@ -3002,5 +3008,9 @@ GRANT SELECT ON public.verification_status_history TO saudaro_worker;
 CREATE POLICY verification_status_history_worker_insert ON public.verification_status_history FOR INSERT TO saudaro_worker WITH CHECK (true);
 --> statement-breakpoint
 GRANT INSERT ON public.verification_status_history TO saudaro_worker;
+--> statement-breakpoint
+CREATE POLICY verification_status_history_authz_insert ON public.verification_status_history FOR INSERT TO saudaro_authz WITH CHECK (true);
+--> statement-breakpoint
+GRANT INSERT ON public.verification_status_history TO saudaro_authz;
 --> statement-breakpoint
 REVOKE CREATE ON SCHEMA app FROM saudaro_authz, saudaro_pub;

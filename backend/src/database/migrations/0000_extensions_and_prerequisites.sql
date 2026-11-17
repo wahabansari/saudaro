@@ -33,5 +33,6 @@ CREATE SEQUENCE IF NOT EXISTS public.deal_reference_seq AS bigint START 1;--> st
 GRANT USAGE ON SEQUENCE public.rfq_reference_seq, public.quotation_reference_seq, public.deal_reference_seq TO saudaro_app;--> statement-breakpoint
 
 -- Functions are executable by nobody unless granted explicitly (default is PUBLIC EXECUTE).
-ALTER DEFAULT PRIVILEGES IN SCHEMA app REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;--> statement-breakpoint
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+-- NOTE: PostgreSQL's built-in default grants EXECUTE to PUBLIC; `IN SCHEMA ... REVOKE` cannot remove that
+-- global default, so it is revoked for ALL future functions created by the migrator (and explicitly again in 0005).
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

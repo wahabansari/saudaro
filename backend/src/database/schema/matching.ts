@@ -31,8 +31,10 @@ export const rfqMatchRuns = pgTable(
     tenantFk('rfq_match_runs_rfq_fk', [t.rfqId, t.companyId], () => [rfqs.id, rfqs.companyId]),
     unique('ux_rfq_match_runs_id_company').on(t.id, t.companyId),
     check('rfq_match_runs_status_chk', oneOf(t.status, MATCH_RUN_STATUS)),
-    index('ix_rfq_match_runs_rfq').on(t.rfqId, t.createdAt.desc()),
-    index('ix_rfq_match_runs_queue').on(t.createdAt).where(sql`${t.status} = 'queued'`),
+    index('ix_rfq_match_runs_rfq').on(t.rfqId, t.createdAt.desc().nullsFirst()),
+    index('ix_rfq_match_runs_queue')
+      .on(t.createdAt)
+      .where(sql`${t.status} = 'queued'`),
   ],
 );
 
@@ -52,14 +54,21 @@ export const rfqSupplierMatches = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('rfq_supplier_matches_run_fk', [t.matchRunId, t.buyerCompanyId], () => [rfqMatchRuns.id, rfqMatchRuns.companyId]),
+    tenantFk('rfq_supplier_matches_run_fk', [t.matchRunId, t.buyerCompanyId], () => [
+      rfqMatchRuns.id,
+      rfqMatchRuns.companyId,
+    ]),
     tenantFk('rfq_supplier_matches_rfq_fk', [t.rfqId, t.buyerCompanyId], () => [rfqs.id, rfqs.companyId]),
     unique('ux_rfq_supplier_matches_id_supplier').on(t.id, t.supplierCompanyId),
     unique('ux_rfq_supplier_matches_run_supplier').on(t.matchRunId, t.supplierCompanyId),
     check('rfq_supplier_matches_score_chk', sql`${t.score} between 0 and 100`),
     check('rfq_supplier_matches_status_chk', oneOf(t.status, MATCH_STATUS)),
     check('rfq_supplier_matches_not_self_chk', sql`${t.supplierCompanyId} <> ${t.buyerCompanyId}`),
-    index('ix_rfq_supplier_matches_supplier').on(t.supplierCompanyId, t.status, t.createdAt.desc()),
+    index('ix_rfq_supplier_matches_supplier').on(
+      t.supplierCompanyId,
+      t.status,
+      t.createdAt.desc().nullsFirst(),
+    ),
     index('ix_rfq_supplier_matches_rfq_rank').on(t.rfqId, t.rank),
   ],
 );
@@ -97,7 +106,9 @@ export const supplierMatchPreferences = pgTable(
     ...stamps(),
   },
   (t) => [
-    unique('ux_supplier_match_preferences').on(t.companyId, t.categoryId, t.destinationCountryId).nullsNotDistinct(),
+    unique('ux_supplier_match_preferences')
+      .on(t.companyId, t.categoryId, t.destinationCountryId)
+      .nullsNotDistinct(),
     index('ix_supplier_match_preferences_company').on(t.companyId),
   ],
 );

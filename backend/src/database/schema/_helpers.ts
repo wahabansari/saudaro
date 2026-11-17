@@ -1,5 +1,13 @@
 import { sql, type SQL } from 'drizzle-orm';
-import { customType, foreignKey, text, timestamp, uuid, type AnyPgColumn, type PgColumn } from 'drizzle-orm/pg-core';
+import {
+  customType,
+  foreignKey,
+  text,
+  timestamp,
+  uuid,
+  type AnyPgColumn,
+  type PgColumn,
+} from 'drizzle-orm/pg-core';
 
 /**
  * Shared column builders and constraint helpers.
@@ -16,7 +24,10 @@ export const citext = customType<{ data: string }>({ dataType: () => 'citext' })
 export const tsvector = customType<{ data: string }>({ dataType: () => 'tsvector' });
 export const bytea = customType<{ data: Buffer }>({ dataType: () => 'bytea' });
 
-export const pk = () => uuid().primaryKey().default(sql`gen_random_uuid()`);
+export const pk = () =>
+  uuid()
+    .primaryKey()
+    .default(sql`gen_random_uuid()`);
 export const tstz = () => timestamp({ withTimezone: true, mode: 'date' });
 export const createdAt = () => tstz().notNull().defaultNow();
 export const stamps = () => ({ createdAt: createdAt(), updatedAt: createdAt() });

@@ -49,10 +49,7 @@ export const companies = pgTable(
     uniqueIndex('ux_companies_slug').on(t.slug),
     check('companies_status_chk', oneOf(t.status, COMPANY_STATUS)),
     check('companies_slug_chk', sql`${t.slug} ~ '^[a-z0-9]([a-z0-9-]{1,62})[a-z0-9]$'`),
-    check(
-      'companies_suspension_chk',
-      sql`(${t.status} = 'suspended') = (${t.suspendedAt} is not null)`,
-    ),
+    check('companies_suspension_chk', sql`(${t.status} = 'suspended') = (${t.suspendedAt} is not null)`),
     index('ix_companies_country_status').on(t.countryId, t.status),
     index('ix_companies_creator').on(t.createdByUserId),
   ],
@@ -76,13 +73,26 @@ export const companyProfiles = pgTable(
     ...stamps(),
   },
   (t) => [
-    check('company_profiles_year_chk', sql`${t.yearEstablished} is null or ${t.yearEstablished} between 1800 and 2200`),
-    check('company_profiles_employees_chk', sql`${t.employeeCountRange} is null or ${oneOf(t.employeeCountRange, EMPLOYEE_RANGES)}`),
+    check(
+      'company_profiles_year_chk',
+      sql`${t.yearEstablished} is null or ${t.yearEstablished} between 1800 and 2200`,
+    ),
+    check(
+      'company_profiles_employees_chk',
+      sql`${t.employeeCountRange} is null or ${oneOf(t.employeeCountRange, EMPLOYEE_RANGES)}`,
+    ),
     check('company_profiles_website_chk', sql`${t.website} is null or ${t.website} ~* '^https?://'`),
   ],
 );
 
-export const ADDRESS_TYPES = ['registered', 'operational', 'factory', 'warehouse', 'billing', 'other'] as const;
+export const ADDRESS_TYPES = [
+  'registered',
+  'operational',
+  'factory',
+  'warehouse',
+  'billing',
+  'other',
+] as const;
 export const companyAddresses = pgTable(
   'company_addresses',
   {
@@ -146,7 +156,9 @@ export const companySettings = pgTable(
     defaultLanguageId: fkOpt(() => languages.id),
     timezone: text().notNull().default('UTC'),
     defaultQuoteValidityDays: smallint().notNull().default(30),
-    defaultRfqVisibility: enumText(['public', 'private', 'invited'] as const).notNull().default('public'),
+    defaultRfqVisibility: enumText(['public', 'private', 'invited'] as const)
+      .notNull()
+      .default('public'),
     requireMfaForAdmins: boolean().notNull().default(false),
     ...stamps(),
   },
@@ -227,8 +239,12 @@ export const companyRoles = pgTable(
     check('company_roles_level_chk', sql`${t.level} between 0 and 100`),
     check('company_roles_system_chk', sql`(${t.isSystem}) = (${t.companyId} is null)`),
     check('company_roles_key_chk', sql`${t.key} ~ '^[a-z][a-z0-9_]{1,40}$'`),
-    uniqueIndex('ux_company_roles_system_key').on(t.key).where(sql`${t.companyId} is null`),
-    uniqueIndex('ux_company_roles_company_key').on(t.companyId, t.key).where(sql`${t.companyId} is not null`),
+    uniqueIndex('ux_company_roles_system_key')
+      .on(t.key)
+      .where(sql`${t.companyId} is null`),
+    uniqueIndex('ux_company_roles_company_key')
+      .on(t.companyId, t.key)
+      .where(sql`${t.companyId} is not null`),
     // Custom roles can never be created at or above 'owner' level.
     check('company_roles_custom_level_chk', sql`${t.isSystem} or ${t.level} < 100`),
   ],

@@ -1,7 +1,22 @@
 import type { Client } from 'pg';
 import {
-  BUSINESS_TYPES, CATEGORIES, CERTIFICATIONS, CERTIFICATION_ISSUERS, COUNTRIES, CURRENCIES, HS_CODES, INCOTERMS_2020,
-  LANGUAGES, PACKAGING, PAYMENT_TERMS, PERMISSIONS, PORTS, SHIPMENT_MODES, SYSTEM_ROLES, UNITS, UNIT_BASE,
+  BUSINESS_TYPES,
+  CATEGORIES,
+  CERTIFICATIONS,
+  CERTIFICATION_ISSUERS,
+  COUNTRIES,
+  CURRENCIES,
+  HS_CODES,
+  INCOTERMS_2020,
+  LANGUAGES,
+  PACKAGING,
+  PAYMENT_TERMS,
+  PERMISSIONS,
+  PORTS,
+  SHIPMENT_MODES,
+  SYSTEM_ROLES,
+  UNITS,
+  UNIT_BASE,
 } from './reference-data.ts';
 
 /**
@@ -46,19 +61,34 @@ export async function seedReference(c: Client): Promise<void> {
       );
     }
     for (const [code, name, cat] of PAYMENT_TERMS) {
-      await c.query('insert into payment_terms (code, name, category) values ($1,$2,$3) on conflict (code) do nothing', [code, name, cat]);
+      await c.query(
+        'insert into payment_terms (code, name, category) values ($1,$2,$3) on conflict (code) do nothing',
+        [code, name, cat],
+      );
     }
     for (const [code, name] of PACKAGING) {
-      await c.query('insert into packaging_types (code, name) values ($1,$2) on conflict (code) do nothing', [code, name]);
+      await c.query('insert into packaging_types (code, name) values ($1,$2) on conflict (code) do nothing', [
+        code,
+        name,
+      ]);
     }
     for (const [code, name] of SHIPMENT_MODES) {
-      await c.query('insert into shipment_modes (code, name) values ($1,$2) on conflict (code) do nothing', [code, name]);
+      await c.query('insert into shipment_modes (code, name) values ($1,$2) on conflict (code) do nothing', [
+        code,
+        name,
+      ]);
     }
     for (const [code, name] of BUSINESS_TYPES) {
-      await c.query('insert into business_types (code, name) values ($1,$2) on conflict (code) do nothing', [code, name]);
+      await c.query('insert into business_types (code, name) values ($1,$2) on conflict (code) do nothing', [
+        code,
+        name,
+      ]);
     }
     for (const [code, name, native, rtl] of LANGUAGES) {
-      await c.query('insert into languages (code, name, native_name, is_rtl) values ($1,$2,$3,$4) on conflict (code) do nothing', [code, name, native, rtl]);
+      await c.query(
+        'insert into languages (code, name, native_name, is_rtl) values ($1,$2,$3,$4) on conflict (code) do nothing',
+        [code, name, native, rtl],
+      );
     }
 
     // Categories (+ transitive closure so subtree queries need no recursion).
@@ -100,10 +130,16 @@ export async function seedReference(c: Client): Promise<void> {
       );
     }
     for (const [code, name] of CERTIFICATION_ISSUERS) {
-      await c.query('insert into certification_issuers (code, name) values ($1,$2) on conflict (code) do nothing', [code, name]);
+      await c.query(
+        'insert into certification_issuers (code, name) values ($1,$2) on conflict (code) do nothing',
+        [code, name],
+      );
     }
     for (const [code, name, cat] of CERTIFICATIONS) {
-      await c.query('insert into certifications (code, name, category) values ($1,$2,$3) on conflict (code) do nothing', [code, name, cat]);
+      await c.query(
+        'insert into certifications (code, name, category) values ($1,$2,$3) on conflict (code) do nothing',
+        [code, name, cat],
+      );
     }
     for (const [locode, name, iso2, type] of PORTS) {
       await c.query(
@@ -119,7 +155,10 @@ export async function seedReference(c: Client): Promise<void> {
 
     // RBAC catalog + system roles (company_id NULL, is_system = true).
     for (const [key, category, description] of PERMISSIONS) {
-      await c.query('insert into permissions (key, category, description) values ($1,$2,$3) on conflict (key) do nothing', [key, category, description]);
+      await c.query(
+        'insert into permissions (key, category, description) values ($1,$2,$3) on conflict (key) do nothing',
+        [key, category, description],
+      );
     }
     for (const role of SYSTEM_ROLES) {
       await c.query(

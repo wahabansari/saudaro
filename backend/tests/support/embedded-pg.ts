@@ -27,7 +27,9 @@ async function freePort(): Promise<number> {
     const srv = createServer();
     srv.listen(0, '127.0.0.1', () => {
       const address = srv.address();
-      srv.close(() => (address && typeof address === 'object' ? resolve(address.port) : reject(new Error('no port'))));
+      srv.close(() =>
+        address && typeof address === 'object' ? resolve(address.port) : reject(new Error('no port')),
+      );
     });
   });
 }

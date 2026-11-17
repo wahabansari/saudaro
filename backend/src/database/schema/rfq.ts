@@ -42,7 +42,15 @@ import {
  * which hide target prices, creator identity, and internal rules.
  */
 
-export const RFQ_STATUS = ['draft', 'published', 'paused', 'closed', 'expired', 'cancelled', 'awarded'] as const;
+export const RFQ_STATUS = [
+  'draft',
+  'published',
+  'paused',
+  'closed',
+  'expired',
+  'cancelled',
+  'awarded',
+] as const;
 export const RFQ_VISIBILITY = ['public', 'private', 'invited'] as const;
 export const rfqs = pgTable(
   'rfqs',
@@ -52,7 +60,9 @@ export const rfqs = pgTable(
     createdByUserId: fk(() => users.id),
     referenceNo: text()
       .notNull()
-      .default(sql`'RFQ-' || to_char(now() at time zone 'utc', 'YYYY') || '-' || lpad(nextval('rfq_reference_seq')::text, 8, '0')`),
+      .default(
+        sql`'RFQ-' || to_char(now() at time zone 'utc', 'YYYY') || '-' || lpad(nextval('rfq_reference_seq')::text, 8, '0')`,
+      ),
     title: text().notNull(),
     description: text(),
     primaryCategoryId: fk(() => productCategories.id),
@@ -80,16 +90,24 @@ export const rfqs = pgTable(
       'rfqs_published_chk',
       sql`${t.status} = 'draft' or ${t.status} = 'cancelled' or (${t.publishedAt} is not null and ${t.expiresAt} is not null)`,
     ),
-    check('rfqs_expiry_chk', sql`${t.expiresAt} is null or ${t.publishedAt} is null or ${t.expiresAt} > ${t.publishedAt}`),
-    check('rfqs_closed_chk', sql`${t.status} not in ('closed','cancelled','expired','awarded') or ${t.closedAt} is not null`),
-    index('ix_rfqs_company_status_created').on(t.companyId, t.status, t.createdAt.desc()),
+    check(
+      'rfqs_expiry_chk',
+      sql`${t.expiresAt} is null or ${t.publishedAt} is null or ${t.expiresAt} > ${t.publishedAt}`,
+    ),
+    check(
+      'rfqs_closed_chk',
+      sql`${t.status} not in ('closed','cancelled','expired','awarded') or ${t.closedAt} is not null`,
+    ),
+    index('ix_rfqs_company_status_created').on(t.companyId, t.status, t.createdAt.desc().nullsFirst()),
     index('ix_rfqs_public_feed')
-      .on(t.publishedAt.desc(), t.id)
+      .on(t.publishedAt.desc().nullsFirst(), t.id)
       .where(sql`${t.status} = 'published' and ${t.visibility} = 'public'`),
     index('ix_rfqs_category_feed')
-      .on(t.primaryCategoryId, t.publishedAt.desc())
+      .on(t.primaryCategoryId, t.publishedAt.desc().nullsFirst())
       .where(sql`${t.status} = 'published'`),
-    index('ix_rfqs_expiry').on(t.expiresAt).where(sql`${t.status} = 'published'`),
+    index('ix_rfqs_expiry')
+      .on(t.expiresAt)
+      .where(sql`${t.status} = 'published'`),
   ],
 );
 
@@ -141,7 +159,10 @@ export const rfqSpecifications = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('rfq_specifications_item_fk', [t.rfqItemId, t.companyId], () => [rfqItems.id, rfqItems.companyId]),
+    tenantFk('rfq_specifications_item_fk', [t.rfqItemId, t.companyId], () => [
+      rfqItems.id,
+      rfqItems.companyId,
+    ]),
     check('rfq_specifications_named_chk', sql`${t.definitionId} is not null or ${t.customName} is not null`),
     check(
       'rfq_specifications_one_shape_chk',
@@ -168,7 +189,10 @@ export const rfqDestinations = pgTable(
   },
   (t) => [
     tenantFk('rfq_destinations_rfq_fk', [t.rfqId, t.companyId], () => [rfqs.id, rfqs.companyId]),
-    check('rfq_destinations_named_place_chk', sql`${t.incotermId} is null or ${t.incotermNamedPlace} is not null or ${t.portId} is not null`),
+    check(
+      'rfq_destinations_named_place_chk',
+      sql`${t.incotermId} is null or ${t.incotermNamedPlace} is not null or ${t.portId} is not null`,
+    ),
     index('ix_rfq_destinations_rfq').on(t.rfqId),
     index('ix_rfq_destinations_country').on(t.countryId),
   ],
@@ -258,9 +282,17 @@ export const rfqCertificationRequirements = pgTable(
     isMandatory: boolean().notNull().default(true),
   },
   (t) => [
-    tenantFk('rfq_certification_requirements_rfq_fk', [t.rfqId, t.companyId], () => [rfqs.id, rfqs.companyId]),
-    tenantFk('rfq_certification_requirements_item_fk', [t.rfqItemId, t.companyId], () => [rfqItems.id, rfqItems.companyId]),
-    unique('ux_rfq_certification_requirements').on(t.rfqId, t.rfqItemId, t.certificationId).nullsNotDistinct(),
+    tenantFk('rfq_certification_requirements_rfq_fk', [t.rfqId, t.companyId], () => [
+      rfqs.id,
+      rfqs.companyId,
+    ]),
+    tenantFk('rfq_certification_requirements_item_fk', [t.rfqItemId, t.companyId], () => [
+      rfqItems.id,
+      rfqItems.companyId,
+    ]),
+    unique('ux_rfq_certification_requirements')
+      .on(t.rfqId, t.rfqItemId, t.certificationId)
+      .nullsNotDistinct(),
     index('ix_rfq_certification_requirements_cert').on(t.certificationId),
   ],
 );
@@ -277,7 +309,12 @@ export const rfqAttachments = pgTable(
   },
   (t) => [
     tenantFk('rfq_attachments_rfq_fk', [t.rfqId, t.companyId], () => [rfqs.id, rfqs.companyId]),
-    tenantFk('rfq_attachments_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
+    tenantFk(
+      'rfq_attachments_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
     unique('ux_rfq_attachments_file').on(t.fileId),
     index('ix_rfq_attachments_rfq').on(t.rfqId),
   ],
@@ -327,7 +364,7 @@ export const rfqInvitations = pgTable(
     unique('ux_rfq_invitations').on(t.rfqId, t.invitedCompanyId),
     check('rfq_invitations_status_chk', oneOf(t.status, INVITATION_RESPONSE)),
     check('rfq_invitations_self_chk', sql`${t.companyId} <> ${t.invitedCompanyId}`),
-    index('ix_rfq_invitations_invitee').on(t.invitedCompanyId, t.status, t.invitedAt.desc()),
+    index('ix_rfq_invitations_invitee').on(t.invitedCompanyId, t.status, t.invitedAt.desc().nullsFirst()),
   ],
 );
 
@@ -346,7 +383,7 @@ export const rfqStatusHistory = pgTable(
   },
   (t) => [
     tenantFk('rfq_status_history_rfq_fk', [t.rfqId, t.companyId], () => [rfqs.id, rfqs.companyId]),
-    index('ix_rfq_status_history_rfq').on(t.rfqId, t.createdAt.desc()),
+    index('ix_rfq_status_history_rfq').on(t.rfqId, t.createdAt.desc().nullsFirst()),
   ],
 );
 
@@ -361,8 +398,8 @@ export const rfqViews = pgTable(
     viewedAt: createdAt(),
   },
   (t) => [
-    index('ix_rfq_views_rfq').on(t.rfqId, t.viewedAt.desc()),
-    index('ix_rfq_views_company').on(t.companyId, t.viewedAt.desc()),
+    index('ix_rfq_views_rfq').on(t.rfqId, t.viewedAt.desc().nullsFirst()),
+    index('ix_rfq_views_company').on(t.companyId, t.viewedAt.desc().nullsFirst()),
   ],
 );
 

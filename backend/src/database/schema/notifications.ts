@@ -48,8 +48,14 @@ export const notifications = pgTable(
   },
   (t) => [
     check('notifications_category_chk', oneOf(t.category, NOTIFICATION_CATEGORIES)),
-    index('ix_notifications_inbox').on(t.recipientUserId, t.createdAt.desc(), t.id.desc()),
-    index('ix_notifications_unread').on(t.recipientUserId, t.createdAt.desc()).where(sql`${t.readAt} is null`),
+    index('ix_notifications_inbox').on(
+      t.recipientUserId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
+    index('ix_notifications_unread')
+      .on(t.recipientUserId, t.createdAt.desc().nullsFirst())
+      .where(sql`${t.readAt} is null`),
   ],
 );
 
@@ -74,7 +80,9 @@ export const notificationDeliveries = pgTable(
     check('notification_deliveries_status_chk', oneOf(t.status, DELIVERY_STATUS)),
     check('notification_deliveries_attempts_chk', sql`${t.attempts} between 0 and 20`),
     // Worker queue: FOR UPDATE SKIP LOCKED over due rows.
-    index('ix_notification_deliveries_queue').on(t.nextAttemptAt).where(sql`${t.status} in ('pending','failed')`),
+    index('ix_notification_deliveries_queue')
+      .on(t.nextAttemptAt)
+      .where(sql`${t.status} in ('pending','failed')`),
   ],
 );
 
@@ -92,6 +100,8 @@ export const deviceTokens = pgTable(
   (t) => [
     unique('ux_device_tokens_token').on(t.token),
     check('device_tokens_platform_chk', oneOf(t.platform, ['ios', 'android', 'web'])),
-    index('ix_device_tokens_user').on(t.userId).where(sql`${t.revokedAt} is null`),
+    index('ix_device_tokens_user')
+      .on(t.userId)
+      .where(sql`${t.revokedAt} is null`),
   ],
 );

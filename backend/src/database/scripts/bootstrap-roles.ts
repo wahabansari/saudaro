@@ -22,7 +22,11 @@ export interface RolePasswords {
 const LOGIN_ROLES = ['saudaro_migrator', 'saudaro_app', 'saudaro_worker', 'saudaro_readonly'] as const;
 const NOLOGIN_ROLES = ['saudaro_authz', 'saudaro_pub'] as const;
 
-export async function bootstrapRoles(client: Client, dbName: string, passwords: RolePasswords): Promise<void> {
+export async function bootstrapRoles(
+  client: Client,
+  dbName: string,
+  passwords: RolePasswords,
+): Promise<void> {
   const q = (s: string) => client.escapeIdentifier(s);
   const lit = (s: string) => client.escapeLiteral(s);
   const pw: Record<(typeof LOGIN_ROLES)[number], string> = {

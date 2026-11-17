@@ -39,7 +39,10 @@ export interface TablePolicy {
 }
 
 /** owner-company CRUD with one permission; reads can be widened with `extra`. */
-const T = (perm: string, o: { extra?: string; noDelete?: boolean; noInsert?: boolean } = {}): TablePolicy => ({
+const T = (
+  perm: string,
+  o: { extra?: string; noDelete?: boolean; noInsert?: boolean } = {},
+): TablePolicy => ({
   select: own() + (o.extra ? ` OR (${o.extra})` : ''),
   ...(o.noInsert ? {} : { insert: ownW(perm) }),
   update: { using: ownW(perm), check: ownW(perm) },
@@ -56,17 +59,37 @@ const adminOnly = (role: string, w = ''): TablePolicy => ({
 const viaDeal = (col = 'deal_id') => via(col, 'deals');
 
 export const REFERENCE_TABLES = [
-  'currencies', 'countries', 'states_provinces', 'cities', 'ports', 'units_of_measure', 'languages', 'incoterms',
-  'payment_terms', 'packaging_types', 'shipment_modes', 'business_types', 'product_categories',
-  'product_category_closure', 'hs_codes', 'certification_issuers', 'certifications', 'permissions',
-  'product_specification_definitions', 'verification_providers',
+  'currencies',
+  'countries',
+  'states_provinces',
+  'cities',
+  'ports',
+  'units_of_measure',
+  'languages',
+  'incoterms',
+  'payment_terms',
+  'packaging_types',
+  'shipment_modes',
+  'business_types',
+  'product_categories',
+  'product_category_closure',
+  'hs_codes',
+  'certification_issuers',
+  'certifications',
+  'permissions',
+  'product_specification_definitions',
+  'verification_providers',
 ] as const;
 
 const refEntries = REFERENCE_TABLES.map((t) => [t, { reference: true } satisfies TablePolicy] as const);
 
 const productChildren = [
-  'product_categories_mapping', 'product_images', 'product_documents', 'product_specifications',
-  'product_certifications', 'product_hs_codes',
+  'product_categories_mapping',
+  'product_images',
+  'product_documents',
+  'product_specifications',
+  'product_certifications',
+  'product_hs_codes',
 ].map(
   (t) =>
     [
@@ -82,17 +105,35 @@ const productChildren = [
 );
 
 const sellerPublic = [
-  'seller_capabilities', 'seller_export_markets', 'seller_supply_regions', 'seller_shipping_ports',
-  'seller_product_capabilities', 'seller_incoterm_capabilities', 'seller_certifications',
-].map((t) => [t, { ...T('seller_profile.manage', { extra: pubSeller() }), worker: 's' } satisfies TablePolicy] as const);
+  'seller_capabilities',
+  'seller_export_markets',
+  'seller_supply_regions',
+  'seller_shipping_ports',
+  'seller_product_capabilities',
+  'seller_incoterm_capabilities',
+  'seller_certifications',
+].map(
+  (t) =>
+    [
+      t,
+      { ...T('seller_profile.manage', { extra: pubSeller() }), worker: 's' } satisfies TablePolicy,
+    ] as const,
+);
 
 const sellerPrivate = [
-  'seller_capacity_records', 'seller_moq_records', 'seller_lead_times', 'seller_packaging_capabilities',
-  'seller_payment_methods', 'seller_accepted_currencies',
+  'seller_capacity_records',
+  'seller_moq_records',
+  'seller_lead_times',
+  'seller_packaging_capabilities',
+  'seller_payment_methods',
+  'seller_accepted_currencies',
 ].map((t) => [t, { ...T('seller_profile.manage'), worker: 's' } satisfies TablePolicy] as const);
 
 const quotationRevisionChildren = [
-  'quotation_items', 'quotation_terms', 'quotation_certifications', 'quotation_attachments',
+  'quotation_items',
+  'quotation_terms',
+  'quotation_certifications',
+  'quotation_attachments',
 ].map(
   (t) =>
     [
@@ -168,7 +209,15 @@ export const SPEC: Record<string, TablePolicy> = {
       using: `(id = ${W} AND ${can('company.manage')}) OR ${adm('moderator')}`,
       check: `(id = ${W} AND ${can('company.manage')}) OR ${adm('moderator')}`,
     },
-    updateCols: ['legal_name', 'display_name', 'slug', 'status', 'suspended_at', 'suspension_reason', 'closed_at'],
+    updateCols: [
+      'legal_name',
+      'display_name',
+      'slug',
+      'status',
+      'suspended_at',
+      'suspension_reason',
+      'closed_at',
+    ],
     worker: 's',
     authz: 'siu',
     authzUpdateCols: ['is_business_verified'],
@@ -178,7 +227,15 @@ export const SPEC: Record<string, TablePolicy> = {
     select: `${own()} OR (is_public AND ${pubCo()})`,
     update: { using: ownW('company.profile.manage'), check: ownW('company.profile.manage') },
     authz: 'si',
-    pub: ['company_id', 'tagline', 'description', 'year_established', 'employee_count_range', 'website', 'is_public'],
+    pub: [
+      'company_id',
+      'tagline',
+      'description',
+      'year_established',
+      'employee_count_range',
+      'website',
+      'is_public',
+    ],
   },
   company_addresses: T('company.profile.manage', { extra: `is_public AND ${pubCo()}` }),
   company_contacts: T('company.profile.manage', { extra: `is_public AND ${pubCo()}` }),
@@ -192,7 +249,10 @@ export const SPEC: Record<string, TablePolicy> = {
   company_roles: {
     select: `company_id is null OR ${own()}`,
     insert: `${ownW('roles.manage')} AND not is_system`,
-    update: { using: `${ownW('roles.manage')} AND not is_system`, check: `${ownW('roles.manage')} AND not is_system` },
+    update: {
+      using: `${ownW('roles.manage')} AND not is_system`,
+      check: `${ownW('roles.manage')} AND not is_system`,
+    },
     delete: `${ownW('roles.manage')} AND not is_system`,
     authz: 's',
     migrator: true,
@@ -276,8 +336,9 @@ export const SPEC: Record<string, TablePolicy> = {
   verification_checks: adminOnly('verification_officer', 'siu'),
   verification_status_history: {
     select: `${own()} OR ${adm('verification_officer')}`,
-    insert: `${own()} OR ${adm('verification_officer')}`,
+    // History is written ONLY by the definer trigger (cannot be forged by any tenant or admin session).
     worker: 'si',
+    authz: 'i',
   },
   compliance_flags: adminOnly('compliance_officer'),
   sanctions_screening_records: adminOnly('compliance_officer', 'si'),
@@ -330,29 +391,72 @@ export const SPEC: Record<string, TablePolicy> = {
     select: own(),
     insert: `${ownW('rfq.create')} AND created_by_user_id = ${U}`,
     update: { using: ownW('rfq.create'), check: ownW('rfq.create') },
-    delete: `${ownW('rfq.manage')} AND status = 'draft'`,
+    // No DELETE: RFQs are cancelled, never erased (status history is append-only and audit-relevant).
     worker: 'su',
     authz: 's',
     pub: [
-      'id', 'reference_no', 'company_id', 'title', 'description', 'primary_category_id', 'status', 'visibility',
-      'currency_id', 'allow_partial_quotes', 'quote_deadline_at', 'published_at', 'expires_at',
+      'id',
+      'reference_no',
+      'company_id',
+      'title',
+      'description',
+      'primary_category_id',
+      'status',
+      'visibility',
+      'currency_id',
+      'allow_partial_quotes',
+      'quote_deadline_at',
+      'published_at',
+      'expires_at',
     ],
   },
   rfq_items: {
     ...T('rfq.create'),
     worker: 's',
     authz: 's',
-    pub: ['id', 'rfq_id', 'line_no', 'product_name', 'description', 'category_id', 'hs_code_id', 'quantity', 'uom_id', 'required_delivery_date'],
+    pub: [
+      'id',
+      'rfq_id',
+      'line_no',
+      'product_name',
+      'description',
+      'category_id',
+      'hs_code_id',
+      'quantity',
+      'uom_id',
+      'required_delivery_date',
+    ],
   },
   rfq_specifications: {
     ...T('rfq.create'),
     worker: 's',
-    pub: ['id', 'rfq_item_id', 'definition_id', 'custom_name', 'value_text', 'value_number', 'value_boolean', 'value_min', 'value_max', 'uom_id', 'is_mandatory'],
+    pub: [
+      'id',
+      'rfq_item_id',
+      'definition_id',
+      'custom_name',
+      'value_text',
+      'value_number',
+      'value_boolean',
+      'value_min',
+      'value_max',
+      'uom_id',
+      'is_mandatory',
+    ],
   },
   rfq_destinations: {
     ...T('rfq.create'),
     worker: 's',
-    pub: ['id', 'rfq_id', 'country_id', 'port_id', 'place_name', 'incoterm_id', 'incoterm_named_place', 'required_by_date'],
+    pub: [
+      'id',
+      'rfq_id',
+      'country_id',
+      'port_id',
+      'place_name',
+      'incoterm_id',
+      'incoterm_named_place',
+      'required_by_date',
+    ],
   },
   rfq_trade_requirements: { ...T('rfq.create'), worker: 's' },
   rfq_payment_preferences: { ...T('rfq.create'), worker: 's' },
@@ -361,7 +465,7 @@ export const SPEC: Record<string, TablePolicy> = {
   rfq_certification_requirements: { ...T('rfq.create'), worker: 's' },
   rfq_visibility_rules: { ...T('rfq.create'), worker: 's', authz: 's' },
   rfq_attachments: T('rfq.create', { extra: 'rfq_id in (select id from app.public_rfqs)' }),
-  rfq_status_history: { select: own(), insert: own(), worker: 's' },
+  rfq_status_history: { select: own(), worker: 's', authz: 'i' },
   rfq_invitations: {
     select: `${own()} OR invited_company_id = ${A}`,
     insert: ownW('rfq.manage'),
@@ -430,8 +534,8 @@ export const SPEC: Record<string, TablePolicy> = {
   },
   quotation_status_history: {
     select: via('quotation_id', 'quotations'),
-    insert: `actor_company_id = ${A} AND ${via('quotation_id', 'quotations')}`,
     worker: 'si',
+    authz: 'i',
   },
   quotation_comparisons: T('rfq.manage'),
   quotation_comparison_entries: T('rfq.manage'),
@@ -467,7 +571,10 @@ export const SPEC: Record<string, TablePolicy> = {
   deal_documents: {
     select: viaDeal(),
     insert: `created_by_company_id = ${W} AND created_by_user_id = ${U} AND ${viaDeal()} AND ${can('deal.manage')}`,
-    update: { using: `${viaDeal()} AND ${can('deal.manage')}`, check: `${viaDeal()} AND ${can('deal.manage')}` },
+    update: {
+      using: `${viaDeal()} AND ${can('deal.manage')}`,
+      check: `${viaDeal()} AND ${can('deal.manage')}`,
+    },
     updateCols: ['title', 'status'],
   },
   deal_document_versions: {
@@ -477,15 +584,22 @@ export const SPEC: Record<string, TablePolicy> = {
   deal_milestones: {
     select: viaDeal(),
     insert: `${viaDeal()} AND ${can('deal.manage')}`,
-    update: { using: `${viaDeal()} AND ${can('deal.manage')}`, check: `${viaDeal()} AND ${can('deal.manage')}` },
+    update: {
+      using: `${viaDeal()} AND ${can('deal.manage')}`,
+      check: `${viaDeal()} AND ${can('deal.manage')}`,
+    },
     updateCols: ['title', 'due_date', 'status', 'completed_at'],
   },
   deal_milestone_events: {
     select: viaDeal(),
     insert: `actor_company_id = ${W} AND actor_user_id = ${U} AND ${viaDeal()}`,
   },
-  deal_status_history: { select: viaDeal(), insert: viaDeal(), worker: 's' },
-  deal_activity_events: { select: viaDeal(), insert: `actor_company_id = ${A} AND ${viaDeal()}`, worker: 'si' },
+  deal_status_history: { select: viaDeal(), worker: 's', authz: 'i' },
+  deal_activity_events: {
+    select: viaDeal(),
+    insert: `actor_company_id = ${A} AND ${viaDeal()}`,
+    worker: 'si',
+  },
   deal_confirmations: {
     select: viaDeal(),
     insert: `company_id = ${W} AND confirmed_by_user_id = ${U} AND ${can('deal.confirm')} AND ${viaDeal()}`,
@@ -507,7 +621,10 @@ export const SPEC: Record<string, TablePolicy> = {
   deal_shipments: {
     select: viaDeal(),
     insert: `added_by_company_id = ${W} AND ${viaDeal()} AND ${can('deal.manage')}`,
-    update: { using: `${viaDeal()} AND ${can('deal.manage')}`, check: `${viaDeal()} AND ${can('deal.manage')}` },
+    update: {
+      using: `${viaDeal()} AND ${can('deal.manage')}`,
+      check: `${viaDeal()} AND ${can('deal.manage')}`,
+    },
   },
 
   // ---------------------------------------------------------------- conversations (participant-based)
@@ -538,7 +655,8 @@ export const SPEC: Record<string, TablePolicy> = {
   },
   message_attachments: {
     select: via('message_id', 'messages'),
-    insert: `message_id in (select id from public.messages where sender_user_id = ${U})`,
+    // The attached file must belong to the sender's company (also enforced by composite FK).
+    insert: `company_id = ${W} AND message_id in (select id from public.messages where sender_user_id = ${U})`,
   },
   message_read_receipts: {
     select: via('message_id', 'messages'),
@@ -564,6 +682,8 @@ export const SPEC: Record<string, TablePolicy> = {
       using: `(reviewer_company_id = ${W} AND ${can('review.write')}) OR ${adm('moderator')}`,
       check: `(reviewer_company_id = ${W} AND ${can('review.write')}) OR ${adm('moderator')}`,
     },
+    // Authors edit content only; moderation columns are never writable by the app role directly.
+    updateCols: ['rating', 'title', 'body', 'status'],
     worker: 's',
   },
   review_responses: {
@@ -615,7 +735,10 @@ export const SPEC: Record<string, TablePolicy> = {
     updateCols: ['revoked_at'],
     authz: 's',
   },
-  admin_actions: { select: `admin_user_id = ${U} OR ${adm('super_admin')}`, insert: `admin_user_id = ${U} AND ${adm()}` },
+  admin_actions: {
+    select: `admin_user_id = ${U} OR ${adm('super_admin')}`,
+    insert: `admin_user_id = ${U} AND ${adm()}`,
+  },
   audit_logs: {
     select: `(company_id = ${A} AND (select app.can_read('audit.read'))) OR ${adm('compliance_officer')} OR ${adm('readonly_auditor')}`,
     insert: `actor_user_id = ${U} AND (company_id is null OR company_id = ${A} OR ${adm()})`,
@@ -637,5 +760,10 @@ export const SPEC: Record<string, TablePolicy> = {
     migrator: true,
   },
   outbox_events: { insert: `company_id is null OR company_id = ${W}`, worker: 'su' },
-  idempotency_keys: { select: `user_id = ${U}`, insert: `user_id = ${U}`, delete: `user_id = ${U}`, worker: 'sd' },
+  idempotency_keys: {
+    select: `user_id = ${U}`,
+    insert: `user_id = ${U}`,
+    delete: `user_id = ${U}`,
+    worker: 'sd',
+  },
 };

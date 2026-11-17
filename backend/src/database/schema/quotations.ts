@@ -60,7 +60,9 @@ export const quotations = pgTable(
     createdByUserId: fk(() => users.id),
     referenceNo: text()
       .notNull()
-      .default(sql`'QUO-' || to_char(now() at time zone 'utc', 'YYYY') || '-' || lpad(nextval('quotation_reference_seq')::text, 8, '0')`),
+      .default(
+        sql`'QUO-' || to_char(now() at time zone 'utc', 'YYYY') || '-' || lpad(nextval('quotation_reference_seq')::text, 8, '0')`,
+      ),
     status: enumText(QUOTATION_STATUS).notNull().default('draft'),
     currentRevisionNo: integer().notNull().default(1),
     /** Set exactly once, on acceptance. FK (accepted_revision_id, id) -> quotation_revisions is added in SQL. */
@@ -75,7 +77,12 @@ export const quotations = pgTable(
     ...stamps(),
   },
   (t) => [
-    tenantFk('quotations_rfq_buyer_fk', [t.rfqId, t.buyerCompanyId], () => [rfqs.id, rfqs.companyId], 'restrict'),
+    tenantFk(
+      'quotations_rfq_buyer_fk',
+      [t.rfqId, t.buyerCompanyId],
+      () => [rfqs.id, rfqs.companyId],
+      'restrict',
+    ),
     unique('ux_quotations_id_company').on(t.id, t.companyId),
     unique('ux_quotations_id_buyer').on(t.id, t.buyerCompanyId),
     uniqueIndex('ux_quotations_reference_no').on(t.referenceNo),
@@ -95,10 +102,12 @@ export const quotations = pgTable(
     ),
     check('quotations_submitted_chk', sql`${t.status} = 'draft' or ${t.submittedAt} is not null`),
     check('quotations_total_chk', sql`${t.totalAmount} is null or ${t.totalAmount} >= 0`),
-    index('ix_quotations_supplier_status').on(t.companyId, t.status, t.createdAt.desc()),
-    index('ix_quotations_buyer_status').on(t.buyerCompanyId, t.status, t.createdAt.desc()),
+    index('ix_quotations_supplier_status').on(t.companyId, t.status, t.createdAt.desc().nullsFirst()),
+    index('ix_quotations_buyer_status').on(t.buyerCompanyId, t.status, t.createdAt.desc().nullsFirst()),
     index('ix_quotations_rfq_status').on(t.rfqId, t.status),
-    index('ix_quotations_expiry').on(t.validUntil).where(sql`${t.status} in ('submitted','under_negotiation')`),
+    index('ix_quotations_expiry')
+      .on(t.validUntil)
+      .where(sql`${t.status} in ('submitted','under_negotiation')`),
   ],
 );
 
@@ -120,13 +129,19 @@ export const quotationRevisions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('quotation_revisions_quotation_fk', [t.quotationId, t.companyId], () => [quotations.id, quotations.companyId]),
+    tenantFk('quotation_revisions_quotation_fk', [t.quotationId, t.companyId], () => [
+      quotations.id,
+      quotations.companyId,
+    ]),
     unique('ux_quotation_revisions_quotation_no').on(t.quotationId, t.revisionNo),
     unique('ux_quotation_revisions_id_company').on(t.id, t.companyId),
     unique('ux_quotation_revisions_id_quotation').on(t.id, t.quotationId),
     check('quotation_revisions_no_chk', sql`${t.revisionNo} >= 1`),
     check('quotation_revisions_status_chk', oneOf(t.status, REVISION_STATUS)),
-    check('quotation_revisions_submitted_chk', sql`(${t.status} = 'submitted') = (${t.submittedAt} is not null)`),
+    check(
+      'quotation_revisions_submitted_chk',
+      sql`(${t.status} = 'submitted') = (${t.submittedAt} is not null)`,
+    ),
     check('quotation_revisions_total_chk', sql`${t.totalAmount} is null or ${t.totalAmount} >= 0`),
   ],
 );
@@ -183,7 +198,10 @@ export const quotationSpecifications = pgTable(
       quotationItems.id,
       quotationItems.companyId,
     ]),
-    check('quotation_specifications_named_chk', sql`${t.definitionId} is not null or ${t.customName} is not null`),
+    check(
+      'quotation_specifications_named_chk',
+      sql`${t.definitionId} is not null or ${t.customName} is not null`,
+    ),
     check(
       'quotation_specifications_one_shape_chk',
       sql`(${t.valueText} is not null)::int + (${t.valueNumber} is not null)::int + (${t.valueBoolean} is not null)::int + (${t.valueMin} is not null or ${t.valueMax} is not null)::int = 1`,
@@ -236,7 +254,12 @@ export const quotationCertifications = pgTable(
       quotationRevisions.id,
       quotationRevisions.companyId,
     ]),
-    tenantFk('quotation_certifications_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
+    tenantFk(
+      'quotation_certifications_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
     unique('ux_quotation_certifications').on(t.revisionId, t.certificationId),
   ],
 );
@@ -256,7 +279,12 @@ export const quotationAttachments = pgTable(
       quotationRevisions.id,
       quotationRevisions.companyId,
     ]),
-    tenantFk('quotation_attachments_file_fk', [t.fileId, t.companyId], () => [files.id, files.companyId], 'restrict'),
+    tenantFk(
+      'quotation_attachments_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
     unique('ux_quotation_attachments_file').on(t.fileId),
     index('ix_quotation_attachments_revision').on(t.revisionId),
   ],
@@ -277,8 +305,11 @@ export const quotationStatusHistory = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('quotation_status_history_quotation_fk', [t.quotationId, t.companyId], () => [quotations.id, quotations.companyId]),
-    index('ix_quotation_status_history_quotation').on(t.quotationId, t.createdAt.desc()),
+    tenantFk('quotation_status_history_quotation_fk', [t.quotationId, t.companyId], () => [
+      quotations.id,
+      quotations.companyId,
+    ]),
+    index('ix_quotation_status_history_quotation').on(t.quotationId, t.createdAt.desc().nullsFirst()),
   ],
 );
 
@@ -345,8 +376,11 @@ export const negotiationEvents = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    tenantFk('negotiation_events_quotation_fk', [t.quotationId, t.companyId], () => [quotations.id, quotations.companyId]),
+    tenantFk('negotiation_events_quotation_fk', [t.quotationId, t.companyId], () => [
+      quotations.id,
+      quotations.companyId,
+    ]),
     check('negotiation_events_type_chk', oneOf(t.eventType, NEGOTIATION_EVENT_TYPES)),
-    index('ix_negotiation_events_quotation').on(t.quotationId, t.createdAt.desc(), t.id),
+    index('ix_negotiation_events_quotation').on(t.quotationId, t.createdAt.desc().nullsFirst(), t.id),
   ],
 );

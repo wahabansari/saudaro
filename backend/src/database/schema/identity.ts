@@ -21,7 +21,14 @@ import { bytea, citext, createdAt, enumText, fk, oneOf, pk, stamps, tstz } from 
  * material (argon2id hash) is optional and only for deployments that self-host credentials.
  */
 
-export const USER_STATUS = ['pending', 'active', 'suspended', 'deactivated', 'deletion_requested', 'deleted'] as const;
+export const USER_STATUS = [
+  'pending',
+  'active',
+  'suspended',
+  'deactivated',
+  'deletion_requested',
+  'deleted',
+] as const;
 export const users = pgTable(
   'users',
   {
@@ -91,7 +98,9 @@ export const userSessions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index('ix_user_sessions_user_active').on(t.userId, t.expiresAt).where(sql`${t.revokedAt} is null`),
+    index('ix_user_sessions_user_active')
+      .on(t.userId, t.expiresAt)
+      .where(sql`${t.revokedAt} is null`),
     index('ix_user_sessions_family').on(t.familyId),
   ],
 );
@@ -128,7 +137,7 @@ export const userSecurityEvents = pgTable(
     detail: jsonb().$type<Record<string, string | number | boolean | null>>(), // never credentials/tokens
     createdAt: createdAt(),
   },
-  (t) => [index('ix_user_security_events_user_time').on(t.userId, t.createdAt.desc())],
+  (t) => [index('ix_user_security_events_user_time').on(t.userId, t.createdAt.desc().nullsFirst())],
 );
 
 const tokenColumns = () => ({
@@ -142,7 +151,9 @@ const tokenColumns = () => ({
 
 export const passwordResetTokens = pgTable('password_reset_tokens', tokenColumns(), (t) => [
   index('ix_password_reset_tokens_user').on(t.userId),
-  index('ix_password_reset_tokens_expiry').on(t.expiresAt).where(sql`${t.consumedAt} is null`),
+  index('ix_password_reset_tokens_expiry')
+    .on(t.expiresAt)
+    .where(sql`${t.consumedAt} is null`),
 ]);
 
 export const emailVerificationTokens = pgTable(

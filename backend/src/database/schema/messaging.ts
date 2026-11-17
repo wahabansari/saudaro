@@ -1,6 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, pgTable, primaryKey, text, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { createdAt, enumText, fk, fkOpt, oneOf, pk, tstz } from './_helpers.ts';
+import {
+  check,
+  foreignKey,
+  index,
+  pgTable,
+  primaryKey,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { createdAt, enumText, fk, fkOpt, oneOf, pk, tenantFk, tstz } from './_helpers.ts';
 import { companies, companyMemberships } from './companies.ts';
 import { deals } from './deals.ts';
 import { files } from './documents.ts';
@@ -28,7 +38,9 @@ export const conversations = pgTable(
     counterpartyCompanyId: fk(() => companies.id),
     createdByUserId: fk(() => users.id),
     subject: text(),
-    status: enumText(['active', 'closed'] as const).notNull().default('active'),
+    status: enumText(['active', 'closed'] as const)
+      .notNull()
+      .default('active'),
     lastMessageAt: tstz(),
     createdAt: createdAt(),
   },
@@ -44,13 +56,17 @@ export const conversations = pgTable(
         or (${t.conversationType} = 'quotation' and ${t.quotationId} is not null and ${t.dealId} is null)
         or (${t.conversationType} = 'deal' and ${t.dealId} is not null)`,
     ),
-    uniqueIndex('ux_conversations_quotation').on(t.quotationId).where(sql`${t.conversationType} = 'quotation'`),
-    uniqueIndex('ux_conversations_deal').on(t.dealId).where(sql`${t.conversationType} = 'deal'`),
+    uniqueIndex('ux_conversations_quotation')
+      .on(t.quotationId)
+      .where(sql`${t.conversationType} = 'quotation'`),
+    uniqueIndex('ux_conversations_deal')
+      .on(t.dealId)
+      .where(sql`${t.conversationType} = 'deal'`),
     uniqueIndex('ux_conversations_rfq_pair')
       .on(t.rfqId, t.initiatorCompanyId, t.counterpartyCompanyId)
       .where(sql`${t.conversationType} = 'rfq'`),
-    index('ix_conversations_initiator').on(t.initiatorCompanyId, t.lastMessageAt.desc()),
-    index('ix_conversations_counterparty').on(t.counterpartyCompanyId, t.lastMessageAt.desc()),
+    index('ix_conversations_initiator').on(t.initiatorCompanyId, t.lastMessageAt.desc().nullsFirst()),
+    index('ix_conversations_counterparty').on(t.counterpartyCompanyId, t.lastMessageAt.desc().nullsFirst()),
   ],
 );
 
@@ -75,7 +91,9 @@ export const conversationParticipants = pgTable(
     }),
     unique('ux_conversation_participants').on(t.conversationId, t.userId),
     check('conversation_participants_role_chk', oneOf(t.participantRole, PARTICIPANT_ROLES)),
-    index('ix_conversation_participants_user').on(t.userId, t.conversationId).where(sql`${t.leftAt} is null`),
+    index('ix_conversation_participants_user')
+      .on(t.userId, t.conversationId)
+      .where(sql`${t.leftAt} is null`),
     index('ix_conversation_participants_company').on(t.companyId),
   ],
 );
@@ -91,21 +109,34 @@ export const messages = pgTable(
     kind: enumText(MESSAGE_KINDS).notNull().default('text'),
     body: text(),
     replyToId: uuid(),
-    moderationStatus: enumText(['visible', 'flagged', 'hidden'] as const).notNull().default('visible'),
+    moderationStatus: enumText(['visible', 'flagged', 'hidden'] as const)
+      .notNull()
+      .default('visible'),
     editedAt: tstz(),
     deletedAt: tstz(),
     createdAt: createdAt(),
   },
   (t) => [
     unique('ux_messages_id_conversation').on(t.id, t.conversationId),
-    foreignKey({ name: 'messages_reply_fk', columns: [t.replyToId, t.conversationId], foreignColumns: [t.id, t.conversationId] }),
+    foreignKey({
+      name: 'messages_reply_fk',
+      columns: [t.replyToId, t.conversationId],
+      foreignColumns: [t.id, t.conversationId],
+    }),
     check('messages_kind_chk', oneOf(t.kind, MESSAGE_KINDS)),
     check('messages_moderation_chk', oneOf(t.moderationStatus, ['visible', 'flagged', 'hidden'])),
     check('messages_body_chk', sql`${t.body} is null or length(${t.body}) <= 10000`),
     check('messages_text_body_chk', sql`${t.kind} <> 'text' or ${t.body} is not null`),
-    check('messages_sender_chk', sql`${t.kind} = 'system' or (${t.senderUserId} is not null and ${t.senderCompanyId} is not null)`),
+    check(
+      'messages_sender_chk',
+      sql`${t.kind} = 'system' or (${t.senderUserId} is not null and ${t.senderCompanyId} is not null)`,
+    ),
     // Efficient history retrieval + keyset pagination.
-    index('ix_messages_conversation_feed').on(t.conversationId, t.createdAt.desc(), t.id.desc()),
+    index('ix_messages_conversation_feed').on(
+      t.conversationId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
   ],
 );
 
@@ -114,10 +145,21 @@ export const messageAttachments = pgTable(
   {
     id: pk(),
     messageId: fk(() => messages.id, 'cascade'),
-    fileId: fk(() => files.id),
+    /** Sender's company: the attached file MUST belong to it (composite tenant FK below). */
+    companyId: uuid().notNull(),
+    fileId: uuid().notNull(),
     createdAt: createdAt(),
   },
-  (t) => [unique('ux_message_attachments_file').on(t.fileId), index('ix_message_attachments_message').on(t.messageId)],
+  (t) => [
+    tenantFk(
+      'message_attachments_file_fk',
+      [t.fileId, t.companyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
+    unique('ux_message_attachments_file').on(t.fileId),
+    index('ix_message_attachments_message').on(t.messageId),
+  ],
 );
 
 export const messageReadReceipts = pgTable(
@@ -127,7 +169,10 @@ export const messageReadReceipts = pgTable(
     userId: fk(() => users.id, 'cascade'),
     readAt: createdAt(),
   },
-  (t) => [primaryKey({ name: 'pk_message_read_receipts', columns: [t.messageId, t.userId] }), index('ix_message_read_receipts_user').on(t.userId, t.readAt.desc())],
+  (t) => [
+    primaryKey({ name: 'pk_message_read_receipts', columns: [t.messageId, t.userId] }),
+    index('ix_message_read_receipts_user').on(t.userId, t.readAt.desc().nullsFirst()),
+  ],
 );
 
 export const messageDeliveryEvents = pgTable(
@@ -176,6 +221,8 @@ export const messageReports = pgTable(
     unique('ux_message_reports').on(t.messageId, t.reporterUserId),
     check('message_reports_reason_chk', oneOf(t.reason, REPORT_REASONS)),
     check('message_reports_status_chk', oneOf(t.status, REPORT_STATUS)),
-    index('ix_message_reports_queue').on(t.status, t.createdAt).where(sql`${t.status} in ('open','reviewing')`),
+    index('ix_message_reports_queue')
+      .on(t.status, t.createdAt)
+      .where(sql`${t.status} in ('open','reviewing')`),
   ],
 );

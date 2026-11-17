@@ -10,6 +10,8 @@ const schema = z.object({
   DATABASE_URL: dbUrl,
   DATABASE_WORKER_URL: dbUrl.optional(),
   DATABASE_SSL: z.enum(['disable', 'require', 'verify-full']).default('disable'),
+  /** PEM of the CA for the database server certificate (needed for managed databases with private CAs). */
+  DATABASE_SSL_CA: z.string().optional(),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(100).default(15_000),
   DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce.number().int().min(100).default(10_000),

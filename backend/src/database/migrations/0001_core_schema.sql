@@ -1859,6 +1859,7 @@ CREATE TABLE "conversations" (
 CREATE TABLE "message_attachments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"message_id" uuid NOT NULL,
+	"company_id" uuid NOT NULL,
 	"file_id" uuid NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "ux_message_attachments_file" UNIQUE("file_id")
@@ -2441,7 +2442,7 @@ ALTER TABLE "deal_confirmations" ADD CONSTRAINT "deal_confirmations_confirmed_by
 ALTER TABLE "deal_disputes" ADD CONSTRAINT "deal_disputes_deal_id_deals_id_fk" FOREIGN KEY ("deal_id") REFERENCES "public"."deals"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deal_disputes" ADD CONSTRAINT "deal_disputes_raised_by_company_id_companies_id_fk" FOREIGN KEY ("raised_by_company_id") REFERENCES "public"."companies"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deal_disputes" ADD CONSTRAINT "deal_disputes_raised_by_user_id_users_id_fk" FOREIGN KEY ("raised_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "deal_document_versions" ADD CONSTRAINT "deal_document_versions_file_id_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."files"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "deal_document_versions" ADD CONSTRAINT "deal_document_versions_file_fk" FOREIGN KEY ("file_id","uploaded_by_company_id") REFERENCES "public"."files"("id","company_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deal_document_versions" ADD CONSTRAINT "deal_document_versions_uploaded_by_company_id_companies_id_fk" FOREIGN KEY ("uploaded_by_company_id") REFERENCES "public"."companies"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deal_document_versions" ADD CONSTRAINT "deal_document_versions_uploaded_by_user_id_users_id_fk" FOREIGN KEY ("uploaded_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "deal_document_versions" ADD CONSTRAINT "deal_document_versions_document_fk" FOREIGN KEY ("document_id","deal_id") REFERENCES "public"."deal_documents"("id","deal_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -2492,7 +2493,7 @@ ALTER TABLE "conversations" ADD CONSTRAINT "conversations_initiator_company_id_c
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_counterparty_company_id_companies_id_fk" FOREIGN KEY ("counterparty_company_id") REFERENCES "public"."companies"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_attachments" ADD CONSTRAINT "message_attachments_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "message_attachments" ADD CONSTRAINT "message_attachments_file_id_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."files"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "message_attachments" ADD CONSTRAINT "message_attachments_file_fk" FOREIGN KEY ("file_id","company_id") REFERENCES "public"."files"("id","company_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_delivery_events" ADD CONSTRAINT "message_delivery_events_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_delivery_events" ADD CONSTRAINT "message_delivery_events_recipient_user_id_users_id_fk" FOREIGN KEY ("recipient_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_read_receipts" ADD CONSTRAINT "message_read_receipts_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -2549,7 +2550,7 @@ CREATE INDEX "ix_password_reset_tokens_expiry" ON "password_reset_tokens" USING 
 CREATE INDEX "ix_phone_verification_tokens_user" ON "phone_verification_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "ix_user_auth_identities_user" ON "user_auth_identities" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "ix_user_mfa_methods_user" ON "user_mfa_methods" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "ix_user_security_events_user_time" ON "user_security_events" USING btree ("user_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_user_security_events_user_time" ON "user_security_events" USING btree ("user_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_user_sessions_user_active" ON "user_sessions" USING btree ("user_id","expires_at") WHERE "user_sessions"."revoked_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_user_sessions_family" ON "user_sessions" USING btree ("family_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_users_email" ON "users" USING btree ("email");--> statement-breakpoint
@@ -2576,13 +2577,13 @@ CREATE INDEX "ix_company_documents_company" ON "company_documents" USING btree (
 CREATE INDEX "ix_file_access_grants_file" ON "file_access_grants" USING btree ("file_id") WHERE "file_access_grants"."revoked_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_file_access_grants_company_grantee" ON "file_access_grants" USING btree ("grantee_company_id") WHERE "file_access_grants"."revoked_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_file_access_grants_user_grantee" ON "file_access_grants" USING btree ("grantee_user_id") WHERE "file_access_grants"."revoked_at" is null;--> statement-breakpoint
-CREATE INDEX "ix_file_scan_results_file" ON "file_scan_results" USING btree ("file_id","scanned_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_files_company_created" ON "files" USING btree ("company_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_file_scan_results_file" ON "file_scan_results" USING btree ("file_id","scanned_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_files_company_created" ON "files" USING btree ("company_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_files_resource" ON "files" USING btree ("resource_type","resource_id");--> statement-breakpoint
 CREATE INDEX "ix_files_scan_pending" ON "files" USING btree ("created_at") WHERE "files"."scan_status" = 'pending';--> statement-breakpoint
 CREATE INDEX "ix_company_verification_levels_company" ON "company_verification_levels" USING btree ("company_id","status");--> statement-breakpoint
 CREATE INDEX "ix_compliance_flags_company_status" ON "compliance_flags" USING btree ("company_id","status");--> statement-breakpoint
-CREATE INDEX "ix_sanctions_screening_company" ON "sanctions_screening_records" USING btree ("company_id","screened_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_sanctions_screening_company" ON "sanctions_screening_records" USING btree ("company_id","screened_at" DESC);--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_verification_cases_open" ON "verification_cases" USING btree ("company_id","level") WHERE "verification_cases"."status" in ('draft','submitted','in_review','needs_info');--> statement-breakpoint
 CREATE INDEX "ix_verification_cases_company" ON "verification_cases" USING btree ("company_id","status");--> statement-breakpoint
 CREATE INDEX "ix_verification_cases_queue" ON "verification_cases" USING btree ("status","submitted_at") WHERE "verification_cases"."status" in ('submitted','in_review');--> statement-breakpoint
@@ -2591,7 +2592,7 @@ CREATE INDEX "ix_verification_documents_case" ON "verification_documents" USING 
 CREATE INDEX "ix_verification_documents_expiry" ON "verification_documents" USING btree ("expires_at") WHERE "verification_documents"."expires_at" is not null;--> statement-breakpoint
 CREATE INDEX "ix_verification_expiry_due" ON "verification_expiry_records" USING btree ("expires_at") WHERE "verification_expiry_records"."status" in ('upcoming','notified');--> statement-breakpoint
 CREATE INDEX "ix_verification_expiry_company" ON "verification_expiry_records" USING btree ("company_id");--> statement-breakpoint
-CREATE INDEX "ix_verification_status_history_case" ON "verification_status_history" USING btree ("case_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_verification_status_history_case" ON "verification_status_history" USING btree ("case_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_product_categories_mapping_category" ON "product_categories_mapping" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "ix_product_certifications_product" ON "product_certifications" USING btree ("product_id");--> statement-breakpoint
 CREATE INDEX "ix_product_certifications_cert" ON "product_certifications" USING btree ("certification_id");--> statement-breakpoint
@@ -2603,10 +2604,10 @@ CREATE UNIQUE INDEX "ux_spec_definitions_global_key" ON "product_specification_d
 CREATE UNIQUE INDEX "ux_spec_definitions_category_key" ON "product_specification_definitions" USING btree ("category_id","key") WHERE "product_specification_definitions"."category_id" is not null;--> statement-breakpoint
 CREATE INDEX "ix_product_specifications_definition_number" ON "product_specifications" USING btree ("definition_id","value_number");--> statement-breakpoint
 CREATE INDEX "ix_product_specifications_definition_text" ON "product_specifications" USING btree ("definition_id","value_text");--> statement-breakpoint
-CREATE INDEX "ix_products_company_status" ON "products" USING btree ("company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_products_category_active" ON "products" USING btree ("primary_category_id","published_at" DESC NULLS LAST) WHERE "products"."status" = 'active';--> statement-breakpoint
+CREATE INDEX "ix_products_company_status" ON "products" USING btree ("company_id","status","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_products_category_active" ON "products" USING btree ("primary_category_id","published_at" DESC) WHERE "products"."status" = 'active';--> statement-breakpoint
 CREATE INDEX "ix_products_origin_active" ON "products" USING btree ("origin_country_id") WHERE "products"."status" = 'active';--> statement-breakpoint
-CREATE INDEX "ix_seller_product_listings_company" ON "seller_product_listings" USING btree ("company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_seller_product_listings_company" ON "seller_product_listings" USING btree ("company_id","status","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_seller_product_listings_product" ON "seller_product_listings" USING btree ("product_id");--> statement-breakpoint
 CREATE INDEX "ix_seller_product_listings_active" ON "seller_product_listings" USING btree ("status","valid_until") WHERE "seller_product_listings"."status" = 'active';--> statement-breakpoint
 CREATE INDEX "ix_buyer_import_requirements_company" ON "buyer_import_requirements" USING btree ("company_id");--> statement-breakpoint
@@ -2630,88 +2631,88 @@ CREATE INDEX "ix_rfq_clarifications_rfq" ON "rfq_clarifications" USING btree ("r
 CREATE INDEX "ix_rfq_clarifications_asker" ON "rfq_clarifications" USING btree ("asked_by_company_id");--> statement-breakpoint
 CREATE INDEX "ix_rfq_destinations_rfq" ON "rfq_destinations" USING btree ("rfq_id");--> statement-breakpoint
 CREATE INDEX "ix_rfq_destinations_country" ON "rfq_destinations" USING btree ("country_id");--> statement-breakpoint
-CREATE INDEX "ix_rfq_invitations_invitee" ON "rfq_invitations" USING btree ("invited_company_id","status","invited_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_rfq_invitations_invitee" ON "rfq_invitations" USING btree ("invited_company_id","status","invited_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_rfq_items_category" ON "rfq_items" USING btree ("category_id");--> statement-breakpoint
 CREATE INDEX "ix_rfq_items_hs" ON "rfq_items" USING btree ("hs_code_id");--> statement-breakpoint
 CREATE INDEX "ix_rfq_saved_records_rfq" ON "rfq_saved_records" USING btree ("rfq_id");--> statement-breakpoint
 CREATE INDEX "ix_rfq_specifications_item" ON "rfq_specifications" USING btree ("rfq_item_id");--> statement-breakpoint
 CREATE INDEX "ix_rfq_specifications_definition" ON "rfq_specifications" USING btree ("definition_id");--> statement-breakpoint
-CREATE INDEX "ix_rfq_status_history_rfq" ON "rfq_status_history" USING btree ("rfq_id","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_rfq_views_rfq" ON "rfq_views" USING btree ("rfq_id","viewed_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_rfq_views_company" ON "rfq_views" USING btree ("company_id","viewed_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_rfq_status_history_rfq" ON "rfq_status_history" USING btree ("rfq_id","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_rfq_views_rfq" ON "rfq_views" USING btree ("rfq_id","viewed_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_rfq_views_company" ON "rfq_views" USING btree ("company_id","viewed_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_rfq_visibility_rules_rfq" ON "rfq_visibility_rules" USING btree ("rfq_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_rfqs_reference_no" ON "rfqs" USING btree ("reference_no");--> statement-breakpoint
-CREATE INDEX "ix_rfqs_company_status_created" ON "rfqs" USING btree ("company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_rfqs_public_feed" ON "rfqs" USING btree ("published_at" DESC NULLS LAST,"id") WHERE "rfqs"."status" = 'published' and "rfqs"."visibility" = 'public';--> statement-breakpoint
-CREATE INDEX "ix_rfqs_category_feed" ON "rfqs" USING btree ("primary_category_id","published_at" DESC NULLS LAST) WHERE "rfqs"."status" = 'published';--> statement-breakpoint
+CREATE INDEX "ix_rfqs_company_status_created" ON "rfqs" USING btree ("company_id","status","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_rfqs_public_feed" ON "rfqs" USING btree ("published_at" DESC,"id") WHERE "rfqs"."status" = 'published' and "rfqs"."visibility" = 'public';--> statement-breakpoint
+CREATE INDEX "ix_rfqs_category_feed" ON "rfqs" USING btree ("primary_category_id","published_at" DESC) WHERE "rfqs"."status" = 'published';--> statement-breakpoint
 CREATE INDEX "ix_rfqs_expiry" ON "rfqs" USING btree ("expires_at") WHERE "rfqs"."status" = 'published';--> statement-breakpoint
 CREATE INDEX "ix_rfq_match_reasons_match" ON "rfq_match_reasons" USING btree ("match_id");--> statement-breakpoint
-CREATE INDEX "ix_rfq_match_runs_rfq" ON "rfq_match_runs" USING btree ("rfq_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_rfq_match_runs_rfq" ON "rfq_match_runs" USING btree ("rfq_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_rfq_match_runs_queue" ON "rfq_match_runs" USING btree ("created_at") WHERE "rfq_match_runs"."status" = 'queued';--> statement-breakpoint
-CREATE INDEX "ix_rfq_supplier_matches_supplier" ON "rfq_supplier_matches" USING btree ("supplier_company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_rfq_supplier_matches_supplier" ON "rfq_supplier_matches" USING btree ("supplier_company_id","status","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_rfq_supplier_matches_rfq_rank" ON "rfq_supplier_matches" USING btree ("rfq_id","rank");--> statement-breakpoint
 CREATE INDEX "ix_supplier_match_preferences_company" ON "supplier_match_preferences" USING btree ("company_id");--> statement-breakpoint
-CREATE INDEX "ix_negotiation_events_quotation" ON "negotiation_events" USING btree ("quotation_id","created_at" DESC NULLS LAST,"id");--> statement-breakpoint
+CREATE INDEX "ix_negotiation_events_quotation" ON "negotiation_events" USING btree ("quotation_id","created_at" DESC,"id");--> statement-breakpoint
 CREATE INDEX "ix_quotation_attachments_revision" ON "quotation_attachments" USING btree ("revision_id");--> statement-breakpoint
 CREATE INDEX "ix_quotation_comparisons_rfq" ON "quotation_comparisons" USING btree ("rfq_id");--> statement-breakpoint
 CREATE INDEX "ix_quotation_items_rfq_item" ON "quotation_items" USING btree ("rfq_item_id");--> statement-breakpoint
 CREATE INDEX "ix_quotation_specifications_item" ON "quotation_specifications" USING btree ("quotation_item_id");--> statement-breakpoint
-CREATE INDEX "ix_quotation_status_history_quotation" ON "quotation_status_history" USING btree ("quotation_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_quotation_status_history_quotation" ON "quotation_status_history" USING btree ("quotation_id","created_at" DESC);--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_quotations_reference_no" ON "quotations" USING btree ("reference_no");--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_quotations_one_live_per_supplier" ON "quotations" USING btree ("rfq_id","company_id") WHERE "quotations"."status" in ('draft','submitted','under_negotiation','accepted');--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_quotations_one_accepted_per_rfq" ON "quotations" USING btree ("rfq_id") WHERE "quotations"."status" = 'accepted';--> statement-breakpoint
-CREATE INDEX "ix_quotations_supplier_status" ON "quotations" USING btree ("company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_quotations_buyer_status" ON "quotations" USING btree ("buyer_company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_quotations_supplier_status" ON "quotations" USING btree ("company_id","status","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_quotations_buyer_status" ON "quotations" USING btree ("buyer_company_id","status","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_quotations_rfq_status" ON "quotations" USING btree ("rfq_id","status");--> statement-breakpoint
 CREATE INDEX "ix_quotations_expiry" ON "quotations" USING btree ("valid_until") WHERE "quotations"."status" in ('submitted','under_negotiation');--> statement-breakpoint
-CREATE INDEX "ix_deal_activity_events_feed" ON "deal_activity_events" USING btree ("deal_id","created_at" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_deal_activity_events_feed" ON "deal_activity_events" USING btree ("deal_id","created_at" DESC,"id" DESC);--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_deal_cancellations_open" ON "deal_cancellations" USING btree ("deal_id") WHERE "deal_cancellations"."status" = 'requested';--> statement-breakpoint
 CREATE INDEX "ix_deal_disputes_deal" ON "deal_disputes" USING btree ("deal_id","status");--> statement-breakpoint
 CREATE INDEX "ix_deal_document_versions_deal" ON "deal_document_versions" USING btree ("deal_id");--> statement-breakpoint
 CREATE INDEX "ix_deal_documents_deal" ON "deal_documents" USING btree ("deal_id","document_type");--> statement-breakpoint
-CREATE INDEX "ix_deal_milestone_events_milestone" ON "deal_milestone_events" USING btree ("milestone_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_deal_milestone_events_milestone" ON "deal_milestone_events" USING btree ("milestone_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_deal_milestones_deal" ON "deal_milestones" USING btree ("deal_id","due_date");--> statement-breakpoint
 CREATE INDEX "ix_deal_parties_company" ON "deal_parties" USING btree ("company_id","deal_id");--> statement-breakpoint
 CREATE INDEX "ix_deal_shipments_deal" ON "deal_shipments" USING btree ("deal_id");--> statement-breakpoint
-CREATE INDEX "ix_deal_status_history_deal" ON "deal_status_history" USING btree ("deal_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_deal_status_history_deal" ON "deal_status_history" USING btree ("deal_id","created_at" DESC);--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_deals_reference_no" ON "deals" USING btree ("reference_no");--> statement-breakpoint
-CREATE INDEX "ix_deals_buyer_status" ON "deals" USING btree ("buyer_company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_deals_supplier_status" ON "deals" USING btree ("supplier_company_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_deals_buyer_status" ON "deals" USING btree ("buyer_company_id","status","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_deals_supplier_status" ON "deals" USING btree ("supplier_company_id","status","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_deals_rfq" ON "deals" USING btree ("rfq_id");--> statement-breakpoint
 CREATE INDEX "ix_conversation_participants_user" ON "conversation_participants" USING btree ("user_id","conversation_id") WHERE "conversation_participants"."left_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_conversation_participants_company" ON "conversation_participants" USING btree ("company_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_conversations_quotation" ON "conversations" USING btree ("quotation_id") WHERE "conversations"."conversation_type" = 'quotation';--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_conversations_deal" ON "conversations" USING btree ("deal_id") WHERE "conversations"."conversation_type" = 'deal';--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_conversations_rfq_pair" ON "conversations" USING btree ("rfq_id","initiator_company_id","counterparty_company_id") WHERE "conversations"."conversation_type" = 'rfq';--> statement-breakpoint
-CREATE INDEX "ix_conversations_initiator" ON "conversations" USING btree ("initiator_company_id","last_message_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_conversations_counterparty" ON "conversations" USING btree ("counterparty_company_id","last_message_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_conversations_initiator" ON "conversations" USING btree ("initiator_company_id","last_message_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_conversations_counterparty" ON "conversations" USING btree ("counterparty_company_id","last_message_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_message_attachments_message" ON "message_attachments" USING btree ("message_id");--> statement-breakpoint
 CREATE INDEX "ix_message_delivery_events_message" ON "message_delivery_events" USING btree ("message_id");--> statement-breakpoint
-CREATE INDEX "ix_message_read_receipts_user" ON "message_read_receipts" USING btree ("user_id","read_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_message_read_receipts_user" ON "message_read_receipts" USING btree ("user_id","read_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_message_reports_queue" ON "message_reports" USING btree ("status","created_at") WHERE "message_reports"."status" in ('open','reviewing');--> statement-breakpoint
-CREATE INDEX "ix_messages_conversation_feed" ON "messages" USING btree ("conversation_id","created_at" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_company_reviews_reviewed" ON "company_reviews" USING btree ("reviewed_company_id","published_at" DESC NULLS LAST) WHERE "company_reviews"."status" = 'published';--> statement-breakpoint
-CREATE INDEX "ix_company_reviews_reviewer" ON "company_reviews" USING btree ("reviewer_company_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_messages_conversation_feed" ON "messages" USING btree ("conversation_id","created_at" DESC,"id" DESC);--> statement-breakpoint
+CREATE INDEX "ix_company_reviews_reviewed" ON "company_reviews" USING btree ("reviewed_company_id","published_at" DESC) WHERE "company_reviews"."status" = 'published';--> statement-breakpoint
+CREATE INDEX "ix_company_reviews_reviewer" ON "company_reviews" USING btree ("reviewer_company_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_company_reviews_queue" ON "company_reviews" USING btree ("created_at") WHERE "company_reviews"."status" = 'pending';--> statement-breakpoint
 CREATE INDEX "ix_device_tokens_user" ON "device_tokens" USING btree ("user_id") WHERE "device_tokens"."revoked_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_notification_deliveries_queue" ON "notification_deliveries" USING btree ("next_attempt_at") WHERE "notification_deliveries"."status" in ('pending','failed');--> statement-breakpoint
-CREATE INDEX "ix_notifications_inbox" ON "notifications" USING btree ("recipient_user_id","created_at" DESC NULLS LAST,"id" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_notifications_unread" ON "notifications" USING btree ("recipient_user_id","created_at" DESC NULLS LAST) WHERE "notifications"."read_at" is null;--> statement-breakpoint
+CREATE INDEX "ix_notifications_inbox" ON "notifications" USING btree ("recipient_user_id","created_at" DESC,"id" DESC);--> statement-breakpoint
+CREATE INDEX "ix_notifications_unread" ON "notifications" USING btree ("recipient_user_id","created_at" DESC) WHERE "notifications"."read_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_abuse_reports_queue" ON "abuse_reports" USING btree ("status","created_at") WHERE "abuse_reports"."status" in ('open','reviewing');--> statement-breakpoint
 CREATE INDEX "ix_abuse_reports_reporter" ON "abuse_reports" USING btree ("reporter_user_id");--> statement-breakpoint
-CREATE INDEX "ix_admin_actions_admin" ON "admin_actions" USING btree ("admin_user_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_admin_actions_admin" ON "admin_actions" USING btree ("admin_user_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_admin_actions_target" ON "admin_actions" USING btree ("target_type","target_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "ux_admin_role_assignments_active" ON "admin_role_assignments" USING btree ("user_id","admin_role") WHERE "admin_role_assignments"."revoked_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_admin_role_assignments_user" ON "admin_role_assignments" USING btree ("user_id") WHERE "admin_role_assignments"."revoked_at" is null;--> statement-breakpoint
-CREATE INDEX "ix_audit_logs_company_time" ON "audit_logs" USING btree ("company_id","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_audit_logs_resource" ON "audit_logs" USING btree ("resource_type","resource_id","created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_audit_logs_actor" ON "audit_logs" USING btree ("actor_user_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_audit_logs_company_time" ON "audit_logs" USING btree ("company_id","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_audit_logs_resource" ON "audit_logs" USING btree ("resource_type","resource_id","created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_audit_logs_actor" ON "audit_logs" USING btree ("actor_user_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_audit_logs_request" ON "audit_logs" USING btree ("request_id");--> statement-breakpoint
 CREATE INDEX "ix_idempotency_keys_expiry" ON "idempotency_keys" USING btree ("expires_at");--> statement-breakpoint
-CREATE INDEX "ix_moderation_actions_case" ON "moderation_actions" USING btree ("case_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "ix_moderation_actions_case" ON "moderation_actions" USING btree ("case_id","created_at" DESC);--> statement-breakpoint
 CREATE INDEX "ix_moderation_cases_queue" ON "moderation_cases" USING btree ("status","created_at") WHERE "moderation_cases"."status" in ('open','in_review');--> statement-breakpoint
 CREATE INDEX "ix_moderation_cases_subject" ON "moderation_cases" USING btree ("subject_type","subject_id");--> statement-breakpoint
 CREATE INDEX "ix_outbox_events_pending" ON "outbox_events" USING btree ("created_at") WHERE "outbox_events"."published_at" is null;--> statement-breakpoint
 CREATE INDEX "ix_outbox_events_aggregate" ON "outbox_events" USING btree ("aggregate_type","aggregate_id");--> statement-breakpoint
-CREATE INDEX "ix_security_events_time" ON "security_events" USING btree ("created_at" DESC NULLS LAST);--> statement-breakpoint
-CREATE INDEX "ix_security_events_severity" ON "security_events" USING btree ("severity","created_at" DESC NULLS LAST) WHERE "security_events"."severity" <> 'info';
+CREATE INDEX "ix_security_events_time" ON "security_events" USING btree ("created_at" DESC);--> statement-breakpoint
+CREATE INDEX "ix_security_events_severity" ON "security_events" USING btree ("severity","created_at" DESC) WHERE "security_events"."severity" <> 'info';

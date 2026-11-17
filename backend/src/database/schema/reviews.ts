@@ -1,5 +1,16 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, integer, numeric, pgTable, smallint, text, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  check,
+  foreignKey,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  smallint,
+  text,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { createdAt, enumText, fk, fkOpt, oneOf, pk, stamps, tstz } from './_helpers.ts';
 import { companies } from './companies.ts';
 import { deals } from './deals.ts';
@@ -40,9 +51,13 @@ export const companyReviews = pgTable(
     check('company_reviews_not_self_chk', sql`${t.reviewerCompanyId} <> ${t.reviewedCompanyId}`),
     check('company_reviews_body_chk', sql`${t.body} is null or length(${t.body}) <= 5000`),
     check('company_reviews_published_chk', sql`(${t.status} = 'published') = (${t.publishedAt} is not null)`),
-    index('ix_company_reviews_reviewed').on(t.reviewedCompanyId, t.publishedAt.desc()).where(sql`${t.status} = 'published'`),
-    index('ix_company_reviews_reviewer').on(t.reviewerCompanyId, t.createdAt.desc()),
-    index('ix_company_reviews_queue').on(t.createdAt).where(sql`${t.status} = 'pending'`),
+    index('ix_company_reviews_reviewed')
+      .on(t.reviewedCompanyId, t.publishedAt.desc().nullsFirst())
+      .where(sql`${t.status} = 'published'`),
+    index('ix_company_reviews_reviewer').on(t.reviewerCompanyId, t.createdAt.desc().nullsFirst()),
+    index('ix_company_reviews_queue')
+      .on(t.createdAt)
+      .where(sql`${t.status} = 'pending'`),
   ],
 );
 
@@ -54,7 +69,9 @@ export const reviewResponses = pgTable(
     respondingCompanyId: uuid().notNull(),
     respondedByUserId: fk(() => users.id),
     body: text().notNull(),
-    status: enumText(['published', 'removed'] as const).notNull().default('published'),
+    status: enumText(['published', 'removed'] as const)
+      .notNull()
+      .default('published'),
     ...stamps(),
   },
   (t) => [
@@ -78,13 +95,18 @@ export const reviewReports = pgTable(
     reporterCompanyId: fk(() => companies.id),
     reason: enumText(['fake', 'abusive', 'conflict_of_interest', 'privacy', 'other'] as const).notNull(),
     details: text(),
-    status: enumText(['open', 'reviewing', 'actioned', 'dismissed'] as const).notNull().default('open'),
+    status: enumText(['open', 'reviewing', 'actioned', 'dismissed'] as const)
+      .notNull()
+      .default('open'),
     createdAt: createdAt(),
     resolvedAt: tstz(),
   },
   (t) => [
     unique('ux_review_reports').on(t.reviewId, t.reporterUserId),
-    check('review_reports_reason_chk', oneOf(t.reason, ['fake', 'abusive', 'conflict_of_interest', 'privacy', 'other'])),
+    check(
+      'review_reports_reason_chk',
+      oneOf(t.reason, ['fake', 'abusive', 'conflict_of_interest', 'privacy', 'other']),
+    ),
     check('review_reports_status_chk', oneOf(t.status, ['open', 'reviewing', 'actioned', 'dismissed'])),
   ],
 );
@@ -103,7 +125,10 @@ export const companyReputationMetrics = pgTable(
     computedAt: tstz().notNull().defaultNow(),
   },
   (t) => [
-    check('company_reputation_metrics_rating_chk', sql`${t.averageRating} is null or ${t.averageRating} between 1 and 5`),
+    check(
+      'company_reputation_metrics_rating_chk',
+      sql`${t.averageRating} is null or ${t.averageRating} between 1 and 5`,
+    ),
     check('company_reputation_metrics_counts_chk', sql`${t.reviewCount} >= 0 and ${t.completedDeals} >= 0`),
   ],
 );

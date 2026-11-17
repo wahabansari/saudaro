@@ -29,7 +29,9 @@ export const files = pgTable(
     sizeBytes: bigint({ mode: 'number' }).notNull(),
     sha256: char({ length: 64 }).notNull(),
     /** 'public' still means "signed-URL delivery, no permanent public URL" (e.g. product images). */
-    accessLevel: enumText(['private', 'public'] as const).notNull().default('private'),
+    accessLevel: enumText(['private', 'public'] as const)
+      .notNull()
+      .default('private'),
     status: enumText(FILE_STATUS).notNull().default('pending_upload'),
     scanStatus: enumText(SCAN_STATUS).notNull().default('pending'),
     /** Informational association; real access derives from the owning join tables + grants. */
@@ -46,7 +48,10 @@ export const files = pgTable(
     check('files_size_chk', sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= ${sql.raw(String(MAX_FILE_BYTES))}`),
     check('files_sha256_chk', sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
     check('files_mime_chk', sql`${t.mimeType} ~ '^[a-z0-9.+-]+/[a-z0-9.+-]+$'`),
-    check('files_filename_chk', sql`${t.originalFilename} !~ '[/\\\\]' and length(${t.originalFilename}) between 1 and 255`),
+    check(
+      'files_filename_chk',
+      sql`${t.originalFilename} !~ '[/\\\\]' and length(${t.originalFilename}) between 1 and 255`,
+    ),
     check('files_status_chk', oneOf(t.status, FILE_STATUS)),
     check('files_scan_chk', oneOf(t.scanStatus, SCAN_STATUS)),
     check('files_retention_chk', oneOf(t.retentionStatus, RETENTION_STATUS)),
@@ -54,9 +59,11 @@ export const files = pgTable(
     // Nothing is shared or public until a malware scan came back clean.
     check('files_public_clean_chk', sql`${t.accessLevel} = 'private' or ${t.scanStatus} = 'clean'`),
     check('files_available_clean_chk', sql`${t.status} <> 'available' or ${t.scanStatus} = 'clean'`),
-    index('ix_files_company_created').on(t.companyId, t.createdAt.desc()),
+    index('ix_files_company_created').on(t.companyId, t.createdAt.desc().nullsFirst()),
     index('ix_files_resource').on(t.resourceType, t.resourceId),
-    index('ix_files_scan_pending').on(t.createdAt).where(sql`${t.scanStatus} = 'pending'`),
+    index('ix_files_scan_pending')
+      .on(t.createdAt)
+      .where(sql`${t.scanStatus} = 'pending'`),
   ],
 );
 
@@ -102,9 +109,15 @@ export const fileAccessGrants = pgTable(
       'file_access_grants_one_grantee_chk',
       sql`(${t.granteeCompanyId} is not null)::int + (${t.granteeUserId} is not null)::int = 1`,
     ),
-    index('ix_file_access_grants_file').on(t.fileId).where(sql`${t.revokedAt} is null`),
-    index('ix_file_access_grants_company_grantee').on(t.granteeCompanyId).where(sql`${t.revokedAt} is null`),
-    index('ix_file_access_grants_user_grantee').on(t.granteeUserId).where(sql`${t.revokedAt} is null`),
+    index('ix_file_access_grants_file')
+      .on(t.fileId)
+      .where(sql`${t.revokedAt} is null`),
+    index('ix_file_access_grants_company_grantee')
+      .on(t.granteeCompanyId)
+      .where(sql`${t.revokedAt} is null`),
+    index('ix_file_access_grants_user_grantee')
+      .on(t.granteeUserId)
+      .where(sql`${t.revokedAt} is null`),
   ],
 );
 
@@ -123,7 +136,7 @@ export const fileScanResults = pgTable(
   (t) => [
     tenantFk('file_scan_results_file_tenant_fk', [t.fileId, t.companyId], () => [files.id, files.companyId]),
     check('file_scan_results_result_chk', oneOf(t.result, ['clean', 'infected', 'error'])),
-    index('ix_file_scan_results_file').on(t.fileId, t.scannedAt.desc()),
+    index('ix_file_scan_results_file').on(t.fileId, t.scannedAt.desc().nullsFirst()),
   ],
 );
 
@@ -146,7 +159,9 @@ export const companyDocuments = pgTable(
     documentType: enumText(COMPANY_DOCUMENT_TYPES).notNull(),
     title: text().notNull(),
     /** private = owner only, verifiers = owner + platform verifiers, public = other companies */
-    visibility: enumText(['private', 'verifiers', 'public'] as const).notNull().default('private'),
+    visibility: enumText(['private', 'verifiers', 'public'] as const)
+      .notNull()
+      .default('private'),
     expiresAt: tstz(),
     createdByUserId: fk(() => users.id),
     createdAt: createdAt(),

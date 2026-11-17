@@ -12,6 +12,8 @@ export interface Tx {
 export interface PoolOptions {
   max?: number;
   ssl?: 'disable' | 'require' | 'verify-full';
+  /** PEM of the CA that signed the database server certificate (managed databases). */
+  sslCa?: string;
   statementTimeoutMs?: number;
   idleInTransactionTimeoutMs?: number;
   lockTimeoutMs?: number;
@@ -25,9 +27,15 @@ export function createPool(connectionString: string, o: PoolOptions = {}): pg.Po
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
     application_name: o.applicationName ?? 'saudaro-api',
-    ssl: o.ssl === 'require' ? { rejectUnauthorized: false } : o.ssl === 'verify-full' ? { rejectUnauthorized: true } : undefined,
+    // Encrypted connections always verify the server certificate (no MITM-able "require" mode).
+    ssl:
+      o.ssl === 'require' || o.ssl === 'verify-full'
+        ? { rejectUnauthorized: true, ...(o.sslCa ? { ca: o.sslCa } : {}) }
+        : undefined,
     ...(o.statementTimeoutMs ? { statement_timeout: o.statementTimeoutMs } : {}),
-    ...(o.idleInTransactionTimeoutMs ? { idle_in_transaction_session_timeout: o.idleInTransactionTimeoutMs } : {}),
+    ...(o.idleInTransactionTimeoutMs
+      ? { idle_in_transaction_session_timeout: o.idleInTransactionTimeoutMs }
+      : {}),
     ...(o.lockTimeoutMs ? { lock_timeout: o.lockTimeoutMs } : {}),
   });
   // An idle-client error must never crash the process.
@@ -43,7 +51,11 @@ export interface TenantContext {
   companyId?: string | null;
 }
 
-async function runInTransaction<T>(pool: pg.Pool, setup: (c: pg.PoolClient) => Promise<void>, fn: (tx: Tx) => Promise<T>): Promise<T> {
+async function runInTransaction<T>(
+  pool: pg.Pool,
+  setup: (c: pg.PoolClient) => Promise<void>,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
   const client = await pool.connect();
   let broken = false;
   try {
@@ -60,6 +72,16 @@ async function runInTransaction<T>(pool: pg.Pool, setup: (c: pg.PoolClient) => P
     }
     throw err;
   } finally {
+    if (!broken) {
+      // Defense in depth: transaction-local settings already vanish at COMMIT/ROLLBACK, but code (or an
+      // injected statement) could have run a SESSION-level set_config/SET. DISCARD ALL wipes every session
+      // setting, so nothing can outlive the request on a pooled connection.
+      try {
+        await client.query('DISCARD ALL');
+      } catch {
+        broken = true;
+      }
+    }
     client.release(broken ? true : undefined);
   }
 }
@@ -70,16 +92,20 @@ async function runInTransaction<T>(pool: pg.Pool, setup: (c: pg.PoolClient) => P
  * vanish at COMMIT/ROLLBACK, so a pooled connection can never leak one tenant's context to the next
  * request. The connection is always released, and rolled back on any error.
  */
-export async function withTenantContext<T>(pool: pg.Pool, ctx: TenantContext, fn: (tx: Tx) => Promise<T>): Promise<T> {
+export async function withTenantContext<T>(
+  pool: pg.Pool,
+  ctx: TenantContext,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
   const userId = uuid.parse(ctx.userId);
   const companyId = ctx.companyId ? uuid.parse(ctx.companyId) : '';
   return runInTransaction(
     pool,
     async (c) => {
-      await c.query("select set_config('app.current_user_id', $1, true), set_config('app.current_company_id', $2, true)", [
-        userId,
-        companyId,
-      ]);
+      await c.query(
+        "select set_config('app.current_user_id', $1, true), set_config('app.current_company_id', $2, true)",
+        [userId, companyId],
+      );
     },
     fn,
   );
@@ -100,7 +126,9 @@ export async function assertSafeRuntimeRole(pool: pg.Pool): Promise<string> {
   const row = r.rows[0];
   if (!row) throw new Error('cannot determine current database role');
   if (row.rolsuper || row.rolbypassrls) {
-    throw new Error(`database role "${row.rolname}" is superuser/BYPASSRLS; use the least-privilege runtime role`);
+    throw new Error(
+      `database role "${row.rolname}" is superuser/BYPASSRLS; use the least-privilege runtime role`,
+    );
   }
   if (row.owns > 0) {
     throw new Error(`database role "${row.rolname}" owns tables; the runtime role must not be a table owner`);

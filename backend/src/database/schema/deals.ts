@@ -1,6 +1,19 @@
 import { sql } from 'drizzle-orm';
-import { check, date, foreignKey, index, integer, numeric, pgTable, smallint, text, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
-import { createdAt, enumText, fk, fkOpt, oneOf, pk, stamps, tstz } from './_helpers.ts';
+import {
+  check,
+  date,
+  foreignKey,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  smallint,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { createdAt, enumText, fk, fkOpt, oneOf, pk, stamps, tenantFk, tstz } from './_helpers.ts';
 import { companies } from './companies.ts';
 import { files } from './documents.ts';
 import { users } from './identity.ts';
@@ -26,14 +39,24 @@ import {
  * by the parties and never implies payment was made.
  */
 
-export const DEAL_STATUS = ['active', 'in_production', 'shipped', 'delivered', 'completed', 'cancelled', 'disputed'] as const;
+export const DEAL_STATUS = [
+  'active',
+  'in_production',
+  'shipped',
+  'delivered',
+  'completed',
+  'cancelled',
+  'disputed',
+] as const;
 export const deals = pgTable(
   'deals',
   {
     id: pk(),
     referenceNo: text()
       .notNull()
-      .default(sql`'DEAL-' || to_char(now() at time zone 'utc', 'YYYY') || '-' || lpad(nextval('deal_reference_seq')::text, 8, '0')`),
+      .default(
+        sql`'DEAL-' || to_char(now() at time zone 'utc', 'YYYY') || '-' || lpad(nextval('deal_reference_seq')::text, 8, '0')`,
+      ),
     quotationId: uuid().notNull(),
     acceptedRevisionId: uuid().notNull(),
     rfqId: fk(() => rfqs.id),
@@ -51,11 +74,31 @@ export const deals = pgTable(
   (t) => [
     // The deal's parties must be exactly the quotation's supplier and the RFQ's buyer, and the
     // snapshot revision must belong to that quotation.
-    foreignKey({ name: 'deals_quotation_supplier_fk', columns: [t.quotationId, t.supplierCompanyId], foreignColumns: [quotations.id, quotations.companyId] }),
-    foreignKey({ name: 'deals_quotation_buyer_fk', columns: [t.quotationId, t.buyerCompanyId], foreignColumns: [quotations.id, quotations.buyerCompanyId] }),
-    foreignKey({ name: 'deals_revision_fk', columns: [t.acceptedRevisionId, t.quotationId], foreignColumns: [quotationRevisions.id, quotationRevisions.quotationId] }),
-    foreignKey({ name: 'deals_buyer_company_fk', columns: [t.buyerCompanyId], foreignColumns: [companies.id] }),
-    foreignKey({ name: 'deals_supplier_company_fk', columns: [t.supplierCompanyId], foreignColumns: [companies.id] }),
+    foreignKey({
+      name: 'deals_quotation_supplier_fk',
+      columns: [t.quotationId, t.supplierCompanyId],
+      foreignColumns: [quotations.id, quotations.companyId],
+    }),
+    foreignKey({
+      name: 'deals_quotation_buyer_fk',
+      columns: [t.quotationId, t.buyerCompanyId],
+      foreignColumns: [quotations.id, quotations.buyerCompanyId],
+    }),
+    foreignKey({
+      name: 'deals_revision_fk',
+      columns: [t.acceptedRevisionId, t.quotationId],
+      foreignColumns: [quotationRevisions.id, quotationRevisions.quotationId],
+    }),
+    foreignKey({
+      name: 'deals_buyer_company_fk',
+      columns: [t.buyerCompanyId],
+      foreignColumns: [companies.id],
+    }),
+    foreignKey({
+      name: 'deals_supplier_company_fk',
+      columns: [t.supplierCompanyId],
+      foreignColumns: [companies.id],
+    }),
     // One deal per quotation: duplicate deal creation is impossible even under races.
     unique('ux_deals_quotation').on(t.quotationId),
     uniqueIndex('ux_deals_reference_no').on(t.referenceNo),
@@ -64,8 +107,8 @@ export const deals = pgTable(
     check('deals_completed_chk', sql`(${t.status} = 'completed') = (${t.completedAt} is not null)`),
     check('deals_cancelled_chk', sql`(${t.status} = 'cancelled') = (${t.cancelledAt} is not null)`),
     check('deals_total_chk', sql`${t.totalAmount} >= 0`),
-    index('ix_deals_buyer_status').on(t.buyerCompanyId, t.status, t.createdAt.desc()),
-    index('ix_deals_supplier_status').on(t.supplierCompanyId, t.status, t.createdAt.desc()),
+    index('ix_deals_buyer_status').on(t.buyerCompanyId, t.status, t.createdAt.desc().nullsFirst()),
+    index('ix_deals_supplier_status').on(t.supplierCompanyId, t.status, t.createdAt.desc().nullsFirst()),
     index('ix_deals_rfq').on(t.rfqId),
   ],
 );
@@ -89,25 +132,22 @@ export const dealParties = pgTable(
 );
 
 /** Immutable snapshot of the agreed commercial terms. */
-export const dealTerms = pgTable(
-  'deal_terms',
-  {
-    dealId: uuid()
-      .primaryKey()
-      .references(() => deals.id, { onDelete: 'cascade' }),
-    incotermId: fkOpt(() => incoterms.id),
-    incotermNamedPlace: text(),
-    portOfLoadingId: fkOpt(() => ports.id),
-    deliveryPlace: text(),
-    paymentTermId: fkOpt(() => paymentTerms.id),
-    paymentTermNotes: text(),
-    packagingTypeId: fkOpt(() => packagingTypes.id),
-    shipmentModeId: fkOpt(() => shipmentModes.id),
-    warrantyTerms: text(),
-    validUntil: tstz(),
-    createdAt: createdAt(),
-  },
-);
+export const dealTerms = pgTable('deal_terms', {
+  dealId: uuid()
+    .primaryKey()
+    .references(() => deals.id, { onDelete: 'cascade' }),
+  incotermId: fkOpt(() => incoterms.id),
+  incotermNamedPlace: text(),
+  portOfLoadingId: fkOpt(() => ports.id),
+  deliveryPlace: text(),
+  paymentTermId: fkOpt(() => paymentTerms.id),
+  paymentTermNotes: text(),
+  packagingTypeId: fkOpt(() => packagingTypes.id),
+  shipmentModeId: fkOpt(() => shipmentModes.id),
+  warrantyTerms: text(),
+  validUntil: tstz(),
+  createdAt: createdAt(),
+});
 
 /** Immutable snapshot of agreed line items. */
 export const dealItems = pgTable(
@@ -150,7 +190,9 @@ export const dealDocuments = pgTable(
     dealId: fk(() => deals.id, 'cascade'),
     documentType: enumText(DEAL_DOCUMENT_TYPES).notNull(),
     title: text().notNull(),
-    status: enumText(['draft', 'active', 'superseded'] as const).notNull().default('active'),
+    status: enumText(['draft', 'active', 'superseded'] as const)
+      .notNull()
+      .default('active'),
     createdByCompanyId: fk(() => companies.id),
     createdByUserId: fk(() => users.id),
     ...stamps(),
@@ -171,14 +213,25 @@ export const dealDocumentVersions = pgTable(
     documentId: uuid().notNull(),
     dealId: uuid().notNull(),
     versionNo: integer().notNull(),
-    fileId: fk(() => files.id),
+    fileId: uuid().notNull(),
     uploadedByCompanyId: fk(() => companies.id),
     uploadedByUserId: fk(() => users.id),
     note: text(),
     createdAt: createdAt(),
   },
   (t) => [
-    foreignKey({ name: 'deal_document_versions_document_fk', columns: [t.documentId, t.dealId], foreignColumns: [dealDocuments.id, dealDocuments.dealId] }).onDelete('cascade'),
+    // The uploaded file must belong to the uploading company (no attaching someone else's file by UUID).
+    tenantFk(
+      'deal_document_versions_file_fk',
+      [t.fileId, t.uploadedByCompanyId],
+      () => [files.id, files.companyId],
+      'restrict',
+    ),
+    foreignKey({
+      name: 'deal_document_versions_document_fk',
+      columns: [t.documentId, t.dealId],
+      foreignColumns: [dealDocuments.id, dealDocuments.dealId],
+    }).onDelete('cascade'),
     unique('ux_deal_document_versions').on(t.documentId, t.versionNo),
     unique('ux_deal_document_versions_file').on(t.fileId),
     check('deal_document_versions_no_chk', sql`${t.versionNo} >= 1`),
@@ -231,8 +284,12 @@ export const dealMilestoneEvents = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    foreignKey({ name: 'deal_milestone_events_milestone_fk', columns: [t.milestoneId, t.dealId], foreignColumns: [dealMilestones.id, dealMilestones.dealId] }).onDelete('cascade'),
-    index('ix_deal_milestone_events_milestone').on(t.milestoneId, t.createdAt.desc()),
+    foreignKey({
+      name: 'deal_milestone_events_milestone_fk',
+      columns: [t.milestoneId, t.dealId],
+      foreignColumns: [dealMilestones.id, dealMilestones.dealId],
+    }).onDelete('cascade'),
+    index('ix_deal_milestone_events_milestone').on(t.milestoneId, t.createdAt.desc().nullsFirst()),
   ],
 );
 
@@ -249,7 +306,7 @@ export const dealStatusHistory = pgTable(
     reason: text(),
     createdAt: createdAt(),
   },
-  (t) => [index('ix_deal_status_history_deal').on(t.dealId, t.createdAt.desc())],
+  (t) => [index('ix_deal_status_history_deal').on(t.dealId, t.createdAt.desc().nullsFirst())],
 );
 
 /** Append-only activity feed; cursor pagination on (deal_id, created_at desc, id desc). */
@@ -266,10 +323,21 @@ export const dealActivityEvents = pgTable(
     resourceId: uuid(),
     createdAt: createdAt(),
   },
-  (t) => [index('ix_deal_activity_events_feed').on(t.dealId, t.createdAt.desc(), t.id.desc())],
+  (t) => [
+    index('ix_deal_activity_events_feed').on(
+      t.dealId,
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
+  ],
 );
 
-export const CONFIRMATION_TYPES = ['terms_agreed', 'goods_dispatched', 'goods_received', 'completion'] as const;
+export const CONFIRMATION_TYPES = [
+  'terms_agreed',
+  'goods_dispatched',
+  'goods_received',
+  'completion',
+] as const;
 export const dealConfirmations = pgTable(
   'deal_confirmations',
   {
@@ -303,12 +371,24 @@ export const dealCancellations = pgTable(
   },
   (t) => [
     check('deal_cancellations_status_chk', oneOf(t.status, CANCELLATION_STATUS)),
-    uniqueIndex('ux_deal_cancellations_open').on(t.dealId).where(sql`${t.status} = 'requested'`),
-    check('deal_cancellations_response_chk', sql`${t.respondedByCompanyId} is null or ${t.respondedByCompanyId} <> ${t.requestedByCompanyId}`),
+    uniqueIndex('ux_deal_cancellations_open')
+      .on(t.dealId)
+      .where(sql`${t.status} = 'requested'`),
+    check(
+      'deal_cancellations_response_chk',
+      sql`${t.respondedByCompanyId} is null or ${t.respondedByCompanyId} <> ${t.requestedByCompanyId}`,
+    ),
   ],
 );
 
-export const DISPUTE_CATEGORIES = ['quality', 'quantity', 'delivery', 'documents', 'payment', 'other'] as const;
+export const DISPUTE_CATEGORIES = [
+  'quality',
+  'quantity',
+  'delivery',
+  'documents',
+  'payment',
+  'other',
+] as const;
 export const dealDisputes = pgTable(
   'deal_disputes',
   {
@@ -318,7 +398,9 @@ export const dealDisputes = pgTable(
     raisedByUserId: fk(() => users.id),
     category: enumText(DISPUTE_CATEGORIES).notNull(),
     description: text().notNull(),
-    status: enumText(['open', 'under_review', 'resolved', 'closed'] as const).notNull().default('open'),
+    status: enumText(['open', 'under_review', 'resolved', 'closed'] as const)
+      .notNull()
+      .default('open'),
     resolution: text(),
     resolvedAt: tstz(),
     ...stamps(),

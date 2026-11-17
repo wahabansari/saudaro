@@ -1,5 +1,17 @@
 import { sql } from 'drizzle-orm';
-import { boolean, check, index, inet, integer, jsonb, pgTable, text, unique, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  inet,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  unique,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { createdAt, enumText, fk, fkOpt, oneOf, pk, stamps, tstz } from './_helpers.ts';
 import { companies } from './companies.ts';
 import { users } from './identity.ts';
@@ -10,7 +22,14 @@ import { users } from './identity.ts';
  * and a trigger rejects UPDATE/DELETE even for the table owner.
  */
 
-export const ADMIN_ROLES = ['super_admin', 'verification_officer', 'moderator', 'support', 'compliance_officer', 'readonly_auditor'] as const;
+export const ADMIN_ROLES = [
+  'super_admin',
+  'verification_officer',
+  'moderator',
+  'support',
+  'compliance_officer',
+  'readonly_auditor',
+] as const;
 export const adminRoleAssignments = pgTable(
   'admin_role_assignments',
   {
@@ -23,8 +42,12 @@ export const adminRoleAssignments = pgTable(
   },
   (t) => [
     check('admin_role_assignments_role_chk', oneOf(t.adminRole, ADMIN_ROLES)),
-    uniqueIndex('ux_admin_role_assignments_active').on(t.userId, t.adminRole).where(sql`${t.revokedAt} is null`),
-    index('ix_admin_role_assignments_user').on(t.userId).where(sql`${t.revokedAt} is null`),
+    uniqueIndex('ux_admin_role_assignments_active')
+      .on(t.userId, t.adminRole)
+      .where(sql`${t.revokedAt} is null`),
+    index('ix_admin_role_assignments_user')
+      .on(t.userId)
+      .where(sql`${t.revokedAt} is null`),
   ],
 );
 
@@ -40,7 +63,10 @@ export const adminActions = pgTable(
     requestId: text(),
     createdAt: createdAt(),
   },
-  (t) => [index('ix_admin_actions_admin').on(t.adminUserId, t.createdAt.desc()), index('ix_admin_actions_target').on(t.targetType, t.targetId)],
+  (t) => [
+    index('ix_admin_actions_admin').on(t.adminUserId, t.createdAt.desc().nullsFirst()),
+    index('ix_admin_actions_target').on(t.targetType, t.targetId),
+  ],
 );
 
 export const ACTOR_TYPES = ['user', 'admin', 'system', 'worker', 'provider'] as const;
@@ -63,9 +89,9 @@ export const auditLogs = pgTable(
   },
   (t) => [
     check('audit_logs_actor_type_chk', oneOf(t.actorType, ACTOR_TYPES)),
-    index('ix_audit_logs_company_time').on(t.companyId, t.createdAt.desc()),
-    index('ix_audit_logs_resource').on(t.resourceType, t.resourceId, t.createdAt.desc()),
-    index('ix_audit_logs_actor').on(t.actorUserId, t.createdAt.desc()),
+    index('ix_audit_logs_company_time').on(t.companyId, t.createdAt.desc().nullsFirst()),
+    index('ix_audit_logs_resource').on(t.resourceType, t.resourceId, t.createdAt.desc().nullsFirst()),
+    index('ix_audit_logs_actor').on(t.actorUserId, t.createdAt.desc().nullsFirst()),
     index('ix_audit_logs_request').on(t.requestId),
   ],
 );
@@ -75,7 +101,9 @@ export const securityEvents = pgTable(
   {
     id: pk(),
     eventType: text().notNull(), // rls_denied, privilege_escalation_attempt, brute_force_suspected, ...
-    severity: enumText(['info', 'warning', 'critical'] as const).notNull().default('info'),
+    severity: enumText(['info', 'warning', 'critical'] as const)
+      .notNull()
+      .default('info'),
     userId: fkOpt(() => users.id),
     companyId: fkOpt(() => companies.id),
     ipAddress: inet(),
@@ -85,8 +113,10 @@ export const securityEvents = pgTable(
   },
   (t) => [
     check('security_events_severity_chk', oneOf(t.severity, ['info', 'warning', 'critical'])),
-    index('ix_security_events_time').on(t.createdAt.desc()),
-    index('ix_security_events_severity').on(t.severity, t.createdAt.desc()).where(sql`${t.severity} <> 'info'`),
+    index('ix_security_events_time').on(t.createdAt.desc().nullsFirst()),
+    index('ix_security_events_severity')
+      .on(t.severity, t.createdAt.desc().nullsFirst())
+      .where(sql`${t.severity} <> 'info'`),
   ],
 );
 
@@ -104,9 +134,14 @@ export const moderationCases = pgTable(
     ...stamps(),
   },
   (t) => [
-    check('moderation_cases_subject_chk', oneOf(t.subjectType, ['message', 'review', 'product', 'rfq', 'company', 'file'])),
+    check(
+      'moderation_cases_subject_chk',
+      oneOf(t.subjectType, ['message', 'review', 'product', 'rfq', 'company', 'file']),
+    ),
     check('moderation_cases_status_chk', oneOf(t.status, MODERATION_STATUS)),
-    index('ix_moderation_cases_queue').on(t.status, t.createdAt).where(sql`${t.status} in ('open','in_review')`),
+    index('ix_moderation_cases_queue')
+      .on(t.status, t.createdAt)
+      .where(sql`${t.status} in ('open','in_review')`),
     index('ix_moderation_cases_subject').on(t.subjectType, t.subjectId),
   ],
 );
@@ -117,13 +152,32 @@ export const moderationActions = pgTable(
     id: pk(),
     caseId: fk(() => moderationCases.id),
     adminUserId: fk(() => users.id),
-    action: enumText(['warn', 'hide_content', 'remove_content', 'suspend_company', 'suspend_user', 'dismiss', 'restore'] as const).notNull(),
+    action: enumText([
+      'warn',
+      'hide_content',
+      'remove_content',
+      'suspend_company',
+      'suspend_user',
+      'dismiss',
+      'restore',
+    ] as const).notNull(),
     note: text().notNull(),
     createdAt: createdAt(),
   },
   (t) => [
-    check('moderation_actions_action_chk', oneOf(t.action, ['warn', 'hide_content', 'remove_content', 'suspend_company', 'suspend_user', 'dismiss', 'restore'])),
-    index('ix_moderation_actions_case').on(t.caseId, t.createdAt.desc()),
+    check(
+      'moderation_actions_action_chk',
+      oneOf(t.action, [
+        'warn',
+        'hide_content',
+        'remove_content',
+        'suspend_company',
+        'suspend_user',
+        'dismiss',
+        'restore',
+      ]),
+    ),
+    index('ix_moderation_actions_case').on(t.caseId, t.createdAt.desc().nullsFirst()),
   ],
 );
 
@@ -137,14 +191,21 @@ export const abuseReports = pgTable(
     subjectId: uuid(),
     reason: text().notNull(),
     details: text(),
-    status: enumText(['open', 'reviewing', 'actioned', 'dismissed'] as const).notNull().default('open'),
+    status: enumText(['open', 'reviewing', 'actioned', 'dismissed'] as const)
+      .notNull()
+      .default('open'),
     createdAt: createdAt(),
     resolvedAt: tstz(),
   },
   (t) => [
-    check('abuse_reports_subject_chk', oneOf(t.subjectType, ['company', 'product', 'rfq', 'quotation', 'user', 'other'])),
+    check(
+      'abuse_reports_subject_chk',
+      oneOf(t.subjectType, ['company', 'product', 'rfq', 'quotation', 'user', 'other']),
+    ),
     check('abuse_reports_status_chk', oneOf(t.status, ['open', 'reviewing', 'actioned', 'dismissed'])),
-    index('ix_abuse_reports_queue').on(t.status, t.createdAt).where(sql`${t.status} in ('open','reviewing')`),
+    index('ix_abuse_reports_queue')
+      .on(t.status, t.createdAt)
+      .where(sql`${t.status} in ('open','reviewing')`),
     index('ix_abuse_reports_reporter').on(t.reporterUserId),
   ],
 );
@@ -181,7 +242,9 @@ export const outboxEvents = pgTable(
   },
   (t) => [
     check('outbox_events_attempts_chk', sql`${t.attempts} between 0 and 50`),
-    index('ix_outbox_events_pending').on(t.createdAt).where(sql`${t.publishedAt} is null`),
+    index('ix_outbox_events_pending')
+      .on(t.createdAt)
+      .where(sql`${t.publishedAt} is null`),
     index('ix_outbox_events_aggregate').on(t.aggregateType, t.aggregateId),
   ],
 );

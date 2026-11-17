@@ -269,7 +269,10 @@ export const hsCodes = pgTable(
   (t) => [
     unique('ux_hs_codes_code_version').on(t.code, t.hsVersion),
     check('hs_codes_level_chk', sql`${t.level} in (2, 4, 6)`),
-    check('hs_codes_code_chk', sql`${t.code} ~ '^[0-9]{2}([0-9]{2}([0-9]{2})?)?$' and length(${t.code}) = ${t.level}`),
+    check(
+      'hs_codes_code_chk',
+      sql`${t.code} ~ '^[0-9]{2}([0-9]{2}([0-9]{2})?)?$' and length(${t.code}) = ${t.level}`,
+    ),
     index('ix_hs_codes_parent').on(t.parentId),
   ],
 );

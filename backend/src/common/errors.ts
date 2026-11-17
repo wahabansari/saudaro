@@ -28,7 +28,11 @@ export function mapDatabaseError(err: unknown): AppError | null {
     case '23505':
       return new AppError(409, 'conflict', 'The resource already exists or conflicts with current state');
     case '23503':
-      return new AppError(409, 'invalid_reference', 'A referenced resource does not exist or is not accessible');
+      return new AppError(
+        409,
+        'invalid_reference',
+        'A referenced resource does not exist or is not accessible',
+      );
     case '23514':
     case '22P02':
     case '22003':

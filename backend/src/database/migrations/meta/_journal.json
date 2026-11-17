@@ -43,6 +43,13 @@
       "when": 1794895824190,
       "tag": "0005_rls_policies_and_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794914906290,
+      "tag": "0006_fk_support_indexes",
+      "breakpoints": true
     }
   ]
 }

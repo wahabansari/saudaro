@@ -11,9 +11,9 @@ import { SPEC, type TablePolicy } from './spec.ts';
  */
 
 export function schemaTables(): string[] {
-  return Object.values(schema)
-    .filter((v): v is PgTable => is(v, PgTable))
-    .map((t) => getTableName(t))
+  return (Object.values(schema) as unknown[])
+    .filter((v) => is(v, PgTable))
+    .map((t) => getTableName(t as PgTable))
     .sort();
 }
 
@@ -21,9 +21,15 @@ const APP = 'saudaro_app';
 const ALL_READERS = 'saudaro_app, saudaro_worker, saudaro_readonly, saudaro_authz, saudaro_pub';
 const BREAK = '\n--> statement-breakpoint\n';
 
-function letters(ops: string | undefined, onlyCols?: string[]): { op: 'select' | 'insert' | 'update' | 'delete'; cols?: string[] }[] {
+function letters(
+  ops: string | undefined,
+  onlyCols?: string[],
+): { op: 'select' | 'insert' | 'update' | 'delete'; cols?: string[] }[] {
   const map = { s: 'select', i: 'insert', u: 'update', d: 'delete' } as const;
-  return [...(ops ?? '')].map((c) => ({ op: map[c as keyof typeof map], ...(c === 'u' && onlyCols ? { cols: onlyCols } : {}) }));
+  return [...(ops ?? '')].map((c) => ({
+    op: map[c as keyof typeof map],
+    ...(c === 'u' && onlyCols ? { cols: onlyCols } : {}),
+  }));
 }
 
 function tableStatements(table: string, p: TablePolicy): string[] {
@@ -31,7 +37,9 @@ function tableStatements(table: string, p: TablePolicy): string[] {
   const out: string[] = [];
   out.push(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`);
   if (!p.reference) out.push(`ALTER TABLE ${t} FORCE ROW LEVEL SECURITY`);
-  out.push(`REVOKE ALL ON ${t} FROM PUBLIC, saudaro_app, saudaro_worker, saudaro_readonly, saudaro_authz, saudaro_pub`);
+  out.push(
+    `REVOKE ALL ON ${t} FROM PUBLIC, saudaro_app, saudaro_worker, saudaro_readonly, saudaro_authz, saudaro_pub`,
+  );
 
   if (p.reference) {
     out.push(`CREATE POLICY ${table}_read ON ${t} FOR SELECT TO ${ALL_READERS} USING (true)`);
@@ -51,7 +59,9 @@ function tableStatements(table: string, p: TablePolicy): string[] {
   }
   if (p.update) {
     const { using, check } = typeof p.update === 'string' ? { using: p.update, check: p.update } : p.update;
-    out.push(`CREATE POLICY ${table}_app_update ON ${t} FOR UPDATE TO ${APP} USING (${using}) WITH CHECK (${check})`);
+    out.push(
+      `CREATE POLICY ${table}_app_update ON ${t} FOR UPDATE TO ${APP} USING (${using}) WITH CHECK (${check})`,
+    );
     out.push(`GRANT UPDATE${p.updateCols ? ` (${p.updateCols.join(', ')})` : ''} ON ${t} TO ${APP}`);
   }
   if (p.delete) {
@@ -70,7 +80,8 @@ function tableStatements(table: string, p: TablePolicy): string[] {
       const name = `${table}_${short}_${op}`;
       if (op === 'select') out.push(`CREATE POLICY ${name} ON ${t} FOR SELECT TO ${role} USING (true)`);
       if (op === 'insert') out.push(`CREATE POLICY ${name} ON ${t} FOR INSERT TO ${role} WITH CHECK (true)`);
-      if (op === 'update') out.push(`CREATE POLICY ${name} ON ${t} FOR UPDATE TO ${role} USING (true) WITH CHECK (true)`);
+      if (op === 'update')
+        out.push(`CREATE POLICY ${name} ON ${t} FOR UPDATE TO ${role} USING (true) WITH CHECK (true)`);
       if (op === 'delete') out.push(`CREATE POLICY ${name} ON ${t} FOR DELETE TO ${role} USING (true)`);
       out.push(`GRANT ${op.toUpperCase()}${c ? ` (${c.join(', ')})` : ''} ON ${t} TO ${role}`);
     }
@@ -83,7 +94,9 @@ function tableStatements(table: string, p: TablePolicy): string[] {
   }
   // ---- seed data written by the migration owner despite FORCE RLS
   if (p.migrator) {
-    out.push(`CREATE POLICY ${table}_migrator_all ON ${t} FOR ALL TO saudaro_migrator USING (true) WITH CHECK (true)`);
+    out.push(
+      `CREATE POLICY ${table}_migrator_all ON ${t} FOR ALL TO saudaro_migrator USING (true) WITH CHECK (true)`,
+    );
   }
   return out;
 }
@@ -94,8 +107,8 @@ const VIEWS = [
     sql: `SELECT r.id, r.reference_no, r.company_id AS buyer_company_id, r.title, r.description, r.primary_category_id,
        r.status, r.currency_id, r.allow_partial_quotes, r.quote_deadline_at, r.published_at, r.expires_at
 FROM public.rfqs r
-WHERE (r.status = 'published' AND r.expires_at > now() AND app.can_view_rfq(r.id, app.active_company()))
-   OR EXISTS (SELECT 1 FROM public.quotations q WHERE q.rfq_id = r.id AND q.company_id = app.active_company())`,
+WHERE (r.status = 'published' AND r.expires_at > now() AND app.can_view_rfq(r.id, (select app.active_company())))
+   OR EXISTS (SELECT 1 FROM public.quotations q WHERE q.rfq_id = r.id AND q.company_id = (select app.active_company()))`,
   },
   {
     name: 'public_rfq_items',
@@ -135,6 +148,15 @@ export function buildMigrationSql(): string {
   }
 
   const statements: string[] = [];
+  // Function privileges are settled BEFORE ownership of the definer functions moves to saudaro_authz
+  // (afterwards the migrator can no longer grant/revoke on them). PUBLIC gets nothing.
+  statements.push('REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA app FROM PUBLIC');
+  statements.push(
+    'GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO saudaro_app, saudaro_worker, saudaro_pub, saudaro_authz',
+  );
+  // Pre-authentication identity lookup is an oracle for arbitrary (provider, subject) pairs: the runtime
+  // role must not call it; the auth service uses the worker pool.
+  statements.push('REVOKE EXECUTE ON FUNCTION app.resolve_identity(text, text) FROM saudaro_app');
   statements.push('GRANT CREATE ON SCHEMA app TO saudaro_authz, saudaro_pub');
   // Every SECURITY DEFINER function becomes owned by the dedicated, non-bypassing helper role.
   statements.push(`DO $do$
@@ -145,7 +167,6 @@ BEGIN
   END LOOP;
 END
 $do$`);
-  statements.push('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA app TO saudaro_app, saudaro_worker, saudaro_pub, saudaro_authz');
   // Views first: some policies (e.g. rfq_attachments) reference them.
   for (const v of VIEWS) {
     statements.push(`CREATE VIEW app.${v.name} WITH (security_barrier = true) AS\n${v.sql}`);
