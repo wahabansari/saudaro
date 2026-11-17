@@ -1,0 +1,33 @@
+# Local development PostgreSQL only. Never use these settings in production.
+# Usage:  docker compose up -d postgres  &&  npm run db:bootstrap && npm run db:migrate
+services:
+  postgres:
+    image: postgres:18
+    container_name: saudaro-postgres
+    restart: unless-stopped
+    environment:
+      # Local-dev bootstrap superuser (used ONLY by `npm run db:bootstrap`, never by the API).
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-root123}
+      POSTGRES_DB: saudaro_marketplace
+    ports:
+      # Bound to loopback only so the dev database is not exposed to the network.
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - saudaro_pgdata:/var/lib/postgresql
+    command:
+      - postgres
+      - -c
+      - log_min_duration_statement=250
+      - -c
+      - idle_in_transaction_session_timeout=30000
+      - -c
+      - password_encryption=scram-sha-256
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U admin -d saudaro_marketplace']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  saudaro_pgdata:

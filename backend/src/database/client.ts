@@ -1,0 +1,109 @@
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
+import { z } from 'zod';
+import * as schema from './schema/index.ts';
+
+export type Db = NodePgDatabase<typeof schema>;
+export interface Tx {
+  db: Db;
+  client: pg.PoolClient;
+}
+
+export interface PoolOptions {
+  max?: number;
+  ssl?: 'disable' | 'require' | 'verify-full';
+  statementTimeoutMs?: number;
+  idleInTransactionTimeoutMs?: number;
+  lockTimeoutMs?: number;
+  applicationName?: string;
+}
+
+export function createPool(connectionString: string, o: PoolOptions = {}): pg.Pool {
+  const pool = new pg.Pool({
+    connectionString,
+    max: o.max ?? 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+    application_name: o.applicationName ?? 'saudaro-api',
+    ssl: o.ssl === 'require' ? { rejectUnauthorized: false } : o.ssl === 'verify-full' ? { rejectUnauthorized: true } : undefined,
+    ...(o.statementTimeoutMs ? { statement_timeout: o.statementTimeoutMs } : {}),
+    ...(o.idleInTransactionTimeoutMs ? { idle_in_transaction_session_timeout: o.idleInTransactionTimeoutMs } : {}),
+    ...(o.lockTimeoutMs ? { lock_timeout: o.lockTimeoutMs } : {}),
+  });
+  // An idle-client error must never crash the process.
+  pool.on('error', () => undefined);
+  return pool;
+}
+
+const uuid = z.uuid();
+export interface TenantContext {
+  /** Authenticated user (from the verified session/JWT), never from a request body. */
+  userId: string;
+  /** Requested active company; the database re-verifies an ACTIVE membership on every statement. */
+  companyId?: string | null;
+}
+
+async function runInTransaction<T>(pool: pg.Pool, setup: (c: pg.PoolClient) => Promise<void>, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    await client.query('BEGIN');
+    await setup(client);
+    const result = await fn({ db: drizzle(client, { schema, casing: 'snake_case' }), client });
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      broken = true; // never return a connection in an unknown state to the pool
+    }
+    throw err;
+  } finally {
+    client.release(broken ? true : undefined);
+  }
+}
+
+/**
+ * Runs `fn` in ONE transaction with transaction-local tenant context (set_config(..., true) is the
+ * parameterized equivalent of SET LOCAL). Because the settings are local to the transaction they
+ * vanish at COMMIT/ROLLBACK, so a pooled connection can never leak one tenant's context to the next
+ * request. The connection is always released, and rolled back on any error.
+ */
+export async function withTenantContext<T>(pool: pg.Pool, ctx: TenantContext, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  const userId = uuid.parse(ctx.userId);
+  const companyId = ctx.companyId ? uuid.parse(ctx.companyId) : '';
+  return runInTransaction(
+    pool,
+    async (c) => {
+      await c.query("select set_config('app.current_user_id', $1, true), set_config('app.current_company_id', $2, true)", [
+        userId,
+        companyId,
+      ]);
+    },
+    fn,
+  );
+}
+
+/** Transaction without user/company context (health checks, worker jobs on the worker pool). */
+export async function withSystemContext<T>(pool: pg.Pool, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return runInTransaction(pool, async () => undefined, fn);
+}
+
+/** Defense in depth: refuse to run if the runtime role could bypass row-level security. */
+export async function assertSafeRuntimeRole(pool: pg.Pool): Promise<string> {
+  const r = await pool.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean; owns: number }>(
+    `select r.rolname, r.rolsuper, r.rolbypassrls,
+            (select count(*)::int from pg_class c where c.relowner = r.oid and c.relnamespace = 'public'::regnamespace) as owns
+     from pg_roles r where r.rolname = current_user`,
+  );
+  const row = r.rows[0];
+  if (!row) throw new Error('cannot determine current database role');
+  if (row.rolsuper || row.rolbypassrls) {
+    throw new Error(`database role "${row.rolname}" is superuser/BYPASSRLS; use the least-privilege runtime role`);
+  }
+  if (row.owns > 0) {
+    throw new Error(`database role "${row.rolname}" owns tables; the runtime role must not be a table owner`);
+  }
+  return row.rolname;
+}

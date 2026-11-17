@@ -1,0 +1,211 @@
+/**
+ * Stable global reference data (NOT business/demo data). Idempotent seeds in seeds/reference.ts.
+ * Codes follow international standards; the lists are a trade-relevant starter set and are
+ * extended by importing full ISO / UN/LOCODE / WCO datasets (documented in DATABASE_DESIGN.md).
+ */
+
+/** ISO 4217: code, numeric, name, symbol, minor units */
+export const CURRENCIES: ReadonlyArray<readonly [string, string, string, string, number]> = [
+  ['USD', '840', 'US Dollar', '$', 2], ['EUR', '978', 'Euro', '€', 2], ['GBP', '826', 'Pound Sterling', '£', 2],
+  ['PKR', '586', 'Pakistani Rupee', '₨', 2], ['CNY', '156', 'Chinese Yuan', '¥', 2], ['INR', '356', 'Indian Rupee', '₹', 2],
+  ['AED', '784', 'UAE Dirham', 'د.إ', 2], ['SAR', '682', 'Saudi Riyal', '﷼', 2], ['TRY', '949', 'Turkish Lira', '₺', 2],
+  ['JPY', '392', 'Japanese Yen', '¥', 0], ['KRW', '410', 'South Korean Won', '₩', 0], ['SGD', '702', 'Singapore Dollar', 'S$', 2],
+  ['HKD', '344', 'Hong Kong Dollar', 'HK$', 2], ['AUD', '036', 'Australian Dollar', 'A$', 2], ['CAD', '124', 'Canadian Dollar', 'C$', 2],
+  ['CHF', '756', 'Swiss Franc', 'CHF', 2], ['SEK', '752', 'Swedish Krona', 'kr', 2], ['NOK', '578', 'Norwegian Krone', 'kr', 2],
+  ['DKK', '208', 'Danish Krone', 'kr', 2], ['PLN', '985', 'Polish Zloty', 'zł', 2], ['CZK', '203', 'Czech Koruna', 'Kč', 2],
+  ['RUB', '643', 'Russian Ruble', '₽', 2], ['BRL', '986', 'Brazilian Real', 'R$', 2], ['MXN', '484', 'Mexican Peso', '$', 2],
+  ['ZAR', '710', 'South African Rand', 'R', 2], ['EGP', '818', 'Egyptian Pound', 'E£', 2], ['NGN', '566', 'Nigerian Naira', '₦', 2],
+  ['KES', '404', 'Kenyan Shilling', 'KSh', 2], ['BDT', '050', 'Bangladeshi Taka', '৳', 2], ['LKR', '144', 'Sri Lankan Rupee', 'Rs', 2],
+  ['THB', '764', 'Thai Baht', '฿', 2], ['VND', '704', 'Vietnamese Dong', '₫', 0], ['IDR', '360', 'Indonesian Rupiah', 'Rp', 2],
+  ['MYR', '458', 'Malaysian Ringgit', 'RM', 2], ['PHP', '608', 'Philippine Peso', '₱', 2], ['QAR', '634', 'Qatari Riyal', 'ر.ق', 2],
+  ['KWD', '414', 'Kuwaiti Dinar', 'KD', 3], ['OMR', '512', 'Omani Rial', 'ر.ع.', 3], ['BHD', '048', 'Bahraini Dinar', 'BD', 3],
+  ['NZD', '554', 'New Zealand Dollar', 'NZ$', 2],
+];
+
+/** ISO 3166-1: alpha-2, alpha-3, name, default currency */
+export const COUNTRIES: ReadonlyArray<readonly [string, string, string, string]> = [
+  ['PK', 'PAK', 'Pakistan', 'PKR'], ['US', 'USA', 'United States', 'USD'], ['GB', 'GBR', 'United Kingdom', 'GBP'],
+  ['CN', 'CHN', 'China', 'CNY'], ['IN', 'IND', 'India', 'INR'], ['AE', 'ARE', 'United Arab Emirates', 'AED'],
+  ['SA', 'SAU', 'Saudi Arabia', 'SAR'], ['TR', 'TUR', 'Türkiye', 'TRY'], ['DE', 'DEU', 'Germany', 'EUR'],
+  ['FR', 'FRA', 'France', 'EUR'], ['IT', 'ITA', 'Italy', 'EUR'], ['ES', 'ESP', 'Spain', 'EUR'], ['NL', 'NLD', 'Netherlands', 'EUR'],
+  ['BE', 'BEL', 'Belgium', 'EUR'], ['PL', 'POL', 'Poland', 'PLN'], ['SE', 'SWE', 'Sweden', 'SEK'], ['NO', 'NOR', 'Norway', 'NOK'],
+  ['DK', 'DNK', 'Denmark', 'DKK'], ['CH', 'CHE', 'Switzerland', 'CHF'], ['AT', 'AUT', 'Austria', 'EUR'], ['PT', 'PRT', 'Portugal', 'EUR'],
+  ['GR', 'GRC', 'Greece', 'EUR'], ['IE', 'IRL', 'Ireland', 'EUR'], ['FI', 'FIN', 'Finland', 'EUR'], ['CZ', 'CZE', 'Czechia', 'CZK'],
+  ['RU', 'RUS', 'Russia', 'RUB'], ['JP', 'JPN', 'Japan', 'JPY'], ['KR', 'KOR', 'South Korea', 'KRW'], ['SG', 'SGP', 'Singapore', 'SGD'],
+  ['HK', 'HKG', 'Hong Kong', 'HKD'], ['TH', 'THA', 'Thailand', 'THB'], ['VN', 'VNM', 'Vietnam', 'VND'], ['ID', 'IDN', 'Indonesia', 'IDR'],
+  ['MY', 'MYS', 'Malaysia', 'MYR'], ['PH', 'PHL', 'Philippines', 'PHP'], ['BD', 'BGD', 'Bangladesh', 'BDT'], ['LK', 'LKA', 'Sri Lanka', 'LKR'],
+  ['AU', 'AUS', 'Australia', 'AUD'], ['NZ', 'NZL', 'New Zealand', 'NZD'], ['CA', 'CAN', 'Canada', 'CAD'], ['MX', 'MEX', 'Mexico', 'MXN'],
+  ['BR', 'BRA', 'Brazil', 'BRL'], ['ZA', 'ZAF', 'South Africa', 'ZAR'], ['EG', 'EGY', 'Egypt', 'EGP'], ['NG', 'NGA', 'Nigeria', 'NGN'],
+  ['KE', 'KEN', 'Kenya', 'KES'], ['QA', 'QAT', 'Qatar', 'QAR'], ['KW', 'KWT', 'Kuwait', 'KWD'], ['OM', 'OMN', 'Oman', 'OMR'],
+  ['BH', 'BHR', 'Bahrain', 'BHD'],
+];
+
+/** UN/CEFACT Recommendation 20: code, symbol, name, dimension */
+export const UNITS: ReadonlyArray<readonly [string, string, string, string]> = [
+  ['KGM', 'kg', 'Kilogram', 'mass'], ['GRM', 'g', 'Gram', 'mass'], ['TNE', 't', 'Metric ton', 'mass'], ['LBR', 'lb', 'Pound', 'mass'],
+  ['MTR', 'm', 'Metre', 'length'], ['CMT', 'cm', 'Centimetre', 'length'], ['MMT', 'mm', 'Millimetre', 'length'], ['YRD', 'yd', 'Yard', 'length'],
+  ['MTK', 'm²', 'Square metre', 'area'], ['MTQ', 'm³', 'Cubic metre', 'volume'], ['LTR', 'L', 'Litre', 'volume'], ['MLT', 'mL', 'Millilitre', 'volume'],
+  ['GLL', 'gal', 'Gallon (US)', 'volume'], ['PCE', 'pc', 'Piece', 'count'], ['SET', 'set', 'Set', 'count'], ['PR', 'pr', 'Pair', 'count'],
+  ['DZN', 'dz', 'Dozen', 'count'], ['BX', 'box', 'Box', 'count'], ['CT', 'ctn', 'Carton', 'count'], ['PF', 'plt', 'Pallet', 'count'],
+  ['CNT', 'cnt', 'Container', 'count'], ['HUR', 'h', 'Hour', 'time'], ['DAY', 'd', 'Day', 'time'], ['MON', 'mo', 'Month', 'time'],
+];
+/** Conversions to the base unit of the same dimension (base = factor 1). */
+export const UNIT_BASE: Record<string, readonly [string, number]> = {
+  GRM: ['KGM', 0.001], TNE: ['KGM', 1000], LBR: ['KGM', 0.45359237], CMT: ['MTR', 0.01], MMT: ['MTR', 0.001], YRD: ['MTR', 0.9144],
+  MLT: ['LTR', 0.001], GLL: ['LTR', 3.785411784], DZN: ['PCE', 12], PR: ['PCE', 2],
+};
+
+/** Incoterms(R) 2020: code, name, mode scope, named place kind, seller arranges main carriage */
+export const INCOTERMS_2020: ReadonlyArray<readonly [string, string, string, string, boolean]> = [
+  ['EXW', 'Ex Works', 'any', 'place_of_delivery', false],
+  ['FCA', 'Free Carrier', 'any', 'place_of_delivery', false],
+  ['CPT', 'Carriage Paid To', 'any', 'place_of_destination', true],
+  ['CIP', 'Carriage and Insurance Paid To', 'any', 'place_of_destination', true],
+  ['DAP', 'Delivered at Place', 'any', 'place_of_destination', true],
+  ['DPU', 'Delivered at Place Unloaded', 'any', 'place_of_destination', true],
+  ['DDP', 'Delivered Duty Paid', 'any', 'place_of_destination', true],
+  ['FAS', 'Free Alongside Ship', 'sea_inland_waterway', 'port_of_loading', false],
+  ['FOB', 'Free On Board', 'sea_inland_waterway', 'port_of_loading', false],
+  ['CFR', 'Cost and Freight', 'sea_inland_waterway', 'port_of_destination', true],
+  ['CIF', 'Cost, Insurance and Freight', 'sea_inland_waterway', 'port_of_destination', true],
+];
+
+export const PAYMENT_TERMS: ReadonlyArray<readonly [string, string, string]> = [
+  ['advance_100', '100% advance payment', 'advance'], ['advance_30_balance_70', '30% advance, 70% before shipment', 'advance'],
+  ['advance_30_balance_bl', '30% advance, 70% against copy of B/L', 'advance'], ['lc_sight', 'Irrevocable L/C at sight', 'letter_of_credit'],
+  ['lc_usance_90', 'Irrevocable L/C, 90 days usance', 'letter_of_credit'], ['dp_sight', 'Documents against payment (D/P)', 'documentary_collection'],
+  ['da_60', 'Documents against acceptance (D/A), 60 days', 'documentary_collection'], ['net_30', 'Open account, net 30 days', 'open_account'],
+  ['net_60', 'Open account, net 60 days', 'open_account'], ['tt_on_delivery', 'Telegraphic transfer on delivery', 'other'],
+];
+
+/** UN/ECE Recommendation 21 package codes */
+export const PACKAGING: ReadonlyArray<readonly [string, string]> = [
+  ['BG', 'Bag'], ['SA', 'Sack'], ['BX', 'Box'], ['CT', 'Carton'], ['PX', 'Pallet'], ['CR', 'Crate'], ['DR', 'Drum'], ['BA', 'Barrel'],
+  ['BE', 'Bundle'], ['RO', 'Roll'], ['BO', 'Bottle'], ['PK', 'Package'], ['CN', 'Container (bulk)'], ['BU', 'Bulk (unpacked)'],
+];
+
+export const SHIPMENT_MODES: ReadonlyArray<readonly [string, string]> = [
+  ['sea_fcl', 'Sea freight, full container load'], ['sea_lcl', 'Sea freight, less than container load'], ['sea_bulk', 'Sea freight, bulk'],
+  ['air', 'Air freight'], ['road', 'Road freight'], ['rail', 'Rail freight'], ['multimodal', 'Multimodal'], ['courier', 'Express courier'],
+];
+
+export const BUSINESS_TYPES: ReadonlyArray<readonly [string, string]> = [
+  ['manufacturer', 'Manufacturer'], ['exporter', 'Exporter'], ['importer', 'Importer'], ['distributor', 'Distributor'],
+  ['wholesaler', 'Wholesaler'], ['trading_company', 'Trading company'], ['supplier', 'Supplier'], ['other', 'Other'],
+];
+
+export const LANGUAGES: ReadonlyArray<readonly [string, string, string, boolean]> = [
+  ['en', 'English', 'English', false], ['ur', 'Urdu', 'اردو', true], ['ar', 'Arabic', 'العربية', true], ['zh', 'Chinese', '中文', false],
+  ['hi', 'Hindi', 'हिन्दी', false], ['bn', 'Bengali', 'বাংলা', false], ['tr', 'Turkish', 'Türkçe', false], ['fr', 'French', 'Français', false],
+  ['de', 'German', 'Deutsch', false], ['es', 'Spanish', 'Español', false], ['pt', 'Portuguese', 'Português', false], ['ru', 'Russian', 'Русский', false],
+  ['ja', 'Japanese', '日本語', false], ['ko', 'Korean', '한국어', false], ['id', 'Indonesian', 'Bahasa Indonesia', false],
+];
+
+/** Product categories: slug, parent slug (or null), name */
+export const CATEGORIES: ReadonlyArray<readonly [string, string | null, string]> = [
+  ['agriculture', null, 'Agriculture & Food'], ['rice', 'agriculture', 'Rice'], ['fruits-vegetables', 'agriculture', 'Fruits & Vegetables'],
+  ['spices', 'agriculture', 'Spices & Herbs'], ['seafood', 'agriculture', 'Seafood'], ['meat-poultry', 'agriculture', 'Meat & Poultry'],
+  ['textiles', null, 'Textiles & Apparel'], ['cotton-fabric', 'textiles', 'Cotton Fabric'], ['garments', 'textiles', 'Garments'],
+  ['home-textiles', 'textiles', 'Home Textiles'], ['yarn', 'textiles', 'Yarn & Thread'],
+  ['leather', null, 'Leather & Footwear'], ['leather-goods', 'leather', 'Leather Goods'], ['footwear', 'leather', 'Footwear'],
+  ['sports-goods', null, 'Sports Goods'], ['surgical-instruments', null, 'Surgical & Medical Instruments'],
+  ['chemicals', null, 'Chemicals & Plastics'], ['plastics', 'chemicals', 'Plastics & Polymers'],
+  ['machinery', null, 'Machinery & Equipment'], ['industrial-machinery', 'machinery', 'Industrial Machinery'],
+  ['electronics', null, 'Electronics & Electrical'], ['consumer-electronics', 'electronics', 'Consumer Electronics'],
+  ['construction', null, 'Construction & Building Materials'], ['ceramics', 'construction', 'Ceramics & Tiles'],
+  ['furniture', null, 'Furniture & Home'], ['minerals', null, 'Minerals & Metals'], ['gems-jewelry', null, 'Gems & Jewelry'],
+  ['packaging', null, 'Packaging & Paper'], ['automotive', null, 'Automotive & Parts'],
+];
+
+/** HS (WCO HS2022) structure sample: chapter (2), heading (4), subheading (6) with description */
+export const HS_CODES: ReadonlyArray<readonly [string, string]> = [
+  ['10', 'Cereals'], ['1006', 'Rice'], ['100630', 'Rice, semi-milled or wholly milled'], ['100640', 'Broken rice'],
+  ['09', 'Coffee, tea, maté and spices'], ['0904', 'Pepper; capsicum or pimenta'], ['0910', 'Ginger, saffron, turmeric, other spices'],
+  ['03', 'Fish and crustaceans'], ['0306', 'Crustaceans'],
+  ['52', 'Cotton'], ['5208', 'Woven fabrics of cotton, <85% cotton, ≤200 g/m²'], ['520811', 'Plain weave, unbleached, ≤100 g/m²'],
+  ['61', 'Articles of apparel, knitted or crocheted'], ['6109', 'T-shirts, singlets and vests, knitted'], ['610910', 'T-shirts of cotton, knitted'],
+  ['63', 'Other made-up textile articles'], ['6302', 'Bed, table, toilet and kitchen linen'],
+  ['41', 'Raw hides and skins and leather'], ['4203', 'Articles of apparel and clothing accessories, of leather'],
+  ['64', 'Footwear, gaiters and the like'], ['6403', 'Footwear with leather uppers'],
+  ['95', 'Toys, games and sports requisites'], ['9506', 'Articles for sports and outdoor games'], ['950662', 'Inflatable balls'],
+  ['90', 'Optical, medical and surgical instruments'], ['9018', 'Medical, surgical or dental instruments'], ['901890', 'Other medical instruments'],
+  ['39', 'Plastics and articles thereof'], ['3923', 'Articles for the conveyance or packing of goods, plastics'],
+  ['84', 'Nuclear reactors, boilers, machinery'], ['8479', 'Machines and mechanical appliances, individual functions'],
+  ['85', 'Electrical machinery and equipment'], ['8517', 'Telephone sets and communication apparatus'],
+  ['69', 'Ceramic products'], ['6907', 'Ceramic flags and paving, tiles'],
+  ['94', 'Furniture; bedding; lamps'], ['9403', 'Other furniture and parts'],
+  ['71', 'Natural or cultured pearls, precious stones and metals'], ['7113', 'Articles of jewellery'],
+  ['25', 'Salt; sulphur; earths and stone; plaster, lime and cement'], ['2501', 'Salt'],
+  ['87', 'Vehicles other than railway'], ['8708', 'Parts and accessories of motor vehicles'],
+];
+
+export const CERTIFICATION_ISSUERS: ReadonlyArray<readonly [string, string]> = [
+  ['iso', 'International Organization for Standardization'], ['sgs', 'SGS'], ['bureau_veritas', 'Bureau Veritas'],
+  ['tuv', 'TÜV'], ['intertek', 'Intertek'], ['global_gap', 'GLOBALG.A.P.'], ['usda', 'USDA'], ['fda', 'U.S. FDA'],
+];
+
+export const CERTIFICATIONS: ReadonlyArray<readonly [string, string, string]> = [
+  ['iso_9001', 'ISO 9001 Quality Management', 'quality'], ['iso_14001', 'ISO 14001 Environmental Management', 'environmental'],
+  ['iso_22000', 'ISO 22000 Food Safety Management', 'food_safety'], ['haccp', 'HACCP', 'food_safety'],
+  ['brcgs', 'BRCGS Global Standard', 'food_safety'], ['fssc_22000', 'FSSC 22000', 'food_safety'], ['gmp', 'GMP', 'quality'],
+  ['ce', 'CE Marking', 'product_safety'], ['ul', 'UL Listing', 'product_safety'], ['rohs', 'RoHS', 'product_safety'],
+  ['reach', 'REACH Compliance', 'product_safety'], ['halal', 'Halal Certification', 'halal'], ['organic_usda', 'USDA Organic', 'organic'],
+  ['organic_eu', 'EU Organic', 'organic'], ['fairtrade', 'Fairtrade', 'social'], ['oeko_tex', 'OEKO-TEX Standard 100', 'product_safety'],
+  ['gots', 'GOTS', 'organic'], ['sa8000', 'SA8000 Social Accountability', 'social'], ['bsci', 'BSCI', 'social'], ['wrap', 'WRAP', 'social'],
+  ['iso_13485', 'ISO 13485 Medical Devices', 'quality'], ['globalgap', 'GLOBALG.A.P.', 'food_safety'],
+];
+
+/** Major ports: UN/LOCODE, name, ISO2 country, type */
+export const PORTS: ReadonlyArray<readonly [string, string, string, string]> = [
+  ['PKKHI', 'Karachi', 'PK', 'sea'], ['PKBQM', 'Port Qasim (Bin Qasim)', 'PK', 'sea'], ['CNSHA', 'Shanghai', 'CN', 'sea'],
+  ['CNNGB', 'Ningbo', 'CN', 'sea'], ['SGSIN', 'Singapore', 'SG', 'sea'], ['AEJEA', 'Jebel Ali', 'AE', 'sea'],
+  ['NLRTM', 'Rotterdam', 'NL', 'sea'], ['DEHAM', 'Hamburg', 'DE', 'sea'], ['BEANR', 'Antwerp', 'BE', 'sea'],
+  ['USLAX', 'Los Angeles', 'US', 'sea'], ['USNYC', 'New York', 'US', 'sea'], ['INNSA', 'Nhava Sheva (JNPT)', 'IN', 'sea'],
+  ['INMUN', 'Mundra', 'IN', 'sea'], ['GBFXT', 'Felixstowe', 'GB', 'sea'], ['MYPKG', 'Port Klang', 'MY', 'sea'],
+  ['LKCMB', 'Colombo', 'LK', 'sea'], ['BDCGP', 'Chittagong', 'BD', 'sea'], ['SAJED', 'Jeddah', 'SA', 'sea'],
+  ['KRPUS', 'Busan', 'KR', 'sea'], ['HKHKG', 'Hong Kong', 'HK', 'sea'], ['JPYOK', 'Yokohama', 'JP', 'sea'],
+  ['ESVLC', 'Valencia', 'ES', 'sea'], ['OMSLL', 'Salalah', 'OM', 'sea'], ['BRSSZ', 'Santos', 'BR', 'sea'],
+  ['ZADUR', 'Durban', 'ZA', 'sea'], ['EGPSD', 'Port Said', 'EG', 'sea'],
+];
+
+/** RBAC catalog */
+export const PERMISSIONS: ReadonlyArray<readonly [string, string, string]> = [
+  ['company.manage', 'company', 'Manage company status and registration identifiers'],
+  ['company.profile.manage', 'company', 'Edit public company profile, addresses and contacts'],
+  ['members.manage', 'team', 'Add, change and remove team members (below own level)'],
+  ['roles.manage', 'team', 'Create and edit custom roles'],
+  ['invitations.manage', 'team', 'Invite people to the company'],
+  ['settings.manage', 'company', 'Edit company settings'],
+  ['files.manage', 'files', 'Upload files and manage file access grants'],
+  ['verification.submit', 'verification', 'Submit documents for business verification'],
+  ['catalog.manage', 'catalog', 'Manage products and listings'],
+  ['seller_profile.manage', 'trade', 'Manage the seller trade profile'],
+  ['buyer_profile.manage', 'trade', 'Manage the buyer profile'],
+  ['rfq.create', 'rfq', 'Create and edit RFQs'],
+  ['rfq.manage', 'rfq', 'Delete drafts, invite suppliers, answer clarifications, compare quotations'],
+  ['quotation.create', 'quotation', 'Create and edit quotation drafts'],
+  ['quotation.submit', 'quotation', 'Submit, revise and withdraw quotations'],
+  ['quotation.accept', 'quotation', 'Accept or reject quotations and create deals'],
+  ['messages.send', 'messaging', 'Send messages in conversations'],
+  ['messages.manage', 'messaging', 'Add colleagues to conversations'],
+  ['deal.manage', 'deal', 'Manage deal documents, milestones, shipments and cancellations'],
+  ['deal.confirm', 'deal', 'Confirm deal steps on behalf of the company'],
+  ['review.write', 'reputation', 'Write reviews'],
+  ['review.respond', 'reputation', 'Respond to reviews'],
+  ['audit.read', 'security', 'Read the company audit log'],
+];
+
+const ALL = PERMISSIONS.map((p) => p[0]);
+const MANAGER = ALL.filter(
+  (p) => !['company.manage', 'members.manage', 'roles.manage', 'invitations.manage', 'settings.manage', 'audit.read'].includes(p),
+);
+const MEMBER = ['files.manage', 'catalog.manage', 'rfq.create', 'quotation.create', 'messages.send'];
+
+/** System roles: key, name, hierarchy level, permissions. Higher level outranks lower. */
+export const SYSTEM_ROLES: ReadonlyArray<{ key: string; name: string; level: number; perms: readonly string[] }> = [
+  { key: 'owner', name: 'Owner', level: 100, perms: ALL },
+  { key: 'admin', name: 'Administrator', level: 80, perms: ALL.filter((p) => p !== 'company.manage') },
+  { key: 'manager', name: 'Manager', level: 60, perms: MANAGER },
+  { key: 'member', name: 'Member', level: 40, perms: MEMBER },
+  { key: 'viewer', name: 'Viewer', level: 20, perms: [] },
+];
