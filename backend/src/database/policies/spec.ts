@@ -148,7 +148,7 @@ const quotationRevisionChildren = [
 );
 
 /** The row's RFQ is one the active company may see (published, unexpired, passes visibility rules). */
-const PUBLIC_RFQ = 'rfq_id in (select id from app.public_rfqs)';
+const PUBLIC_RFQ = 'exists (select 1 from app.public_rfqs p where p.id = rfq_id)';
 
 export const SPEC: Record<string, TablePolicy> = {
   // ---------------------------------------------------------------- reference
@@ -465,7 +465,7 @@ export const SPEC: Record<string, TablePolicy> = {
   rfq_required_documents: { ...T('rfq.create', { extra: PUBLIC_RFQ }), worker: 's' },
   rfq_certification_requirements: { ...T('rfq.create', { extra: PUBLIC_RFQ }), worker: 's' },
   rfq_visibility_rules: { ...T('rfq.create'), worker: 's', authz: 's' },
-  rfq_attachments: T('rfq.create', { extra: PUBLIC_RFQ }),
+  rfq_attachments: T('rfq.create', { extra: 'rfq_id in (select id from app.public_rfqs)' }),
   rfq_status_history: { select: own(), worker: 's', authz: 'i' },
   rfq_invitations: {
     select: `${own()} OR invited_company_id = ${A}`,
@@ -504,7 +504,7 @@ export const SPEC: Record<string, TablePolicy> = {
     worker: 'siu',
   },
   rfq_match_reasons: {
-    select: `supplier_company_id = ${A} AND match_id in (select id from public.rfq_supplier_matches where ${PUBLIC_RFQ})`,
+    select: `supplier_company_id = ${A} AND exists (select 1 from public.rfq_supplier_matches m where m.id = match_id)`,
     worker: 'si',
   },
   supplier_match_preferences: { ...T('seller_profile.manage'), worker: 's' },

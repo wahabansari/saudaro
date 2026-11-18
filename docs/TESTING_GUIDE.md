@@ -8,7 +8,7 @@ npm test                              # everything
 npx vitest run packages/database-utils   # one package
 ```
 
-Current result (last run, twice in a row): **19 test files, 235 tests, all passing**; `tsc --noEmit`, ESLint and Prettier
+Current result (last run, twice in a row): **21 test files, 245 tests, all passing**; `tsc --noEmit`, ESLint and Prettier
 clean. `tests/e2e/auth-and-company.test.ts` runs real identity + company services behind real gateways over HTTP on one
 embedded database.
 Coverage percentage has **not been measured** yet — no figure is claimed.

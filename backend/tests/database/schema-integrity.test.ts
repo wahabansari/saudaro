@@ -5,7 +5,7 @@ import { loadEnv } from '../../src/config/env.ts';
 import { mapDatabaseError } from '../../src/common/errors.ts';
 import { assertSafeRuntimeRole, createPool } from '../../src/database/client.ts';
 import { buildMigrationSql, schemaTables } from '../../src/database/policies/generate-rls-migration.ts';
-import { REFERENCE_TABLES } from '../../src/database/policies/spec.ts';
+import { BASELINE_0005, REFERENCE_TABLES } from '../../src/database/policies/spec.ts';
 import { seedReference } from '../../src/database/seeds/reference.ts';
 import { appPool, expectDbError, newWorld, urls, type World } from '../support/world.ts';
 
@@ -36,7 +36,7 @@ describe('database connection & migrations', () => {
     const applied = await w.one<{ n: string }>(
       'select count(*)::text as n from drizzle.__drizzle_migrations',
     );
-    expect(Number(applied.n)).toBe(7);
+    expect(Number(applied.n)).toBe(8);
     const tables = await w.admin.query(
       "select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r'",
     );
@@ -46,9 +46,9 @@ describe('database connection & migrations', () => {
     expect(ext.rowCount).toBe(2);
   });
 
-  it('keeps the committed RLS migration in sync with the policy spec (no drift)', () => {
+  it('keeps the applied 0005 RLS migration in sync with the policy spec plus the pre-0007 baseline (no drift)', () => {
     const file = new URL('../../src/database/migrations/0005_rls_policies_and_grants.sql', import.meta.url);
-    expect(readFileSync(file, 'utf8')).toBe(buildMigrationSql());
+    expect(readFileSync(file, 'utf8')).toBe(buildMigrationSql(BASELINE_0005));
   });
 
   it('role hardening: no login role is superuser/bypassrls/createrole, helper roles cannot log in', async () => {

@@ -1,11 +1,11 @@
 # Trade profiles, RFQ and supplier matching: UI design reference
 
 Status: designed, not yet implemented.
-Last verified against sources: 2026-11-17.
+Last verified against sources: 2026-11-18.
 Scope: module G (Seller trade profile and buyer profile, 21 tables), module H (RFQ management, 16 tables), module I (Supplier matching, 5 tables) of the 155-table design.
 Audience: UI/UX designer. This document is self-contained. No code access is needed.
 
-Sources: `backend/docs/DATABASE_REFERENCE.md` (sections G, H, I), `backend/docs/ERD.md`, `backend/docs/DATABASE_DESIGN.md`, `backend/docs/SECURITY_ARCHITECTURE.md`, `backend/src/database/schema/trade-profiles.ts`, `rfq.ts`, `matching.ts`, migrations `0001_core_schema.sql` (CHECKs), `0003_functions_and_triggers.sql` (triggers and functions), `0005_rls_policies_and_grants.sql` (RLS, grants, projection views), `docs/ARCHITECTURE_ASSESSMENT.md` section 4, `docs/SYSTEM_ARCHITECTURE.md` sections 2, 5, 6, `docs/ARCHITECTURE_DECISIONS.md` section 3.
+Sources: `backend/docs/DATABASE_REFERENCE.md` (sections G, H, I), `backend/docs/ERD.md`, `backend/docs/DATABASE_DESIGN.md`, `backend/docs/SECURITY_ARCHITECTURE.md`, `backend/src/database/schema/trade-profiles.ts`, `rfq.ts`, `matching.ts`, migrations `0001_core_schema.sql` (CHECKs), `0003_functions_and_triggers.sql` (triggers and functions), `0005_rls_policies_and_grants.sql` (RLS, grants, projection views), `0007_review_fixes.sql` (additive fixes after 0006; changes listed in section 6), `backend/src/database/policies/spec.ts` (final policy state), `docs/ARCHITECTURE_ASSESSMENT.md` section 4, `docs/SYSTEM_ARCHITECTURE.md` sections 2, 5, 6, `docs/ARCHITECTURE_DECISIONS.md` section 3.
 
 ---
 
@@ -39,17 +39,17 @@ Sources: `backend/docs/DATABASE_REFERENCE.md` (sections G, H, I), `backend/docs/
 
 | Table | Represents | Key columns | Relations |
 |---|---|---|---|
-| `seller_trade_profiles` | One per company. Seller identity block. Primary key is the company. | `company_id` (PK); `seller_type` (enum, section 1.4); `summary` text; `years_exporting` smallint; `default_quote_validity_days` smallint, default 30, range 1-365; `accepts_rfqs` boolean, default true; `response_time_hours` smallint; `is_published` boolean, default false; `published_at` timestamptz, required when `is_published` is true; `version`; `created_at`; `updated_at` | `companies` (1:1, cascade) |
-| `seller_capabilities` | Capability types the company offers. One row per type. | `id`; `capability_type` (enum, section 1.4); `description` text; unique (`company_id`, `capability_type`) | `companies` |
+| `seller_trade_profiles` | One per company. Seller identity block. Primary key is the company. | `company_id` (PK); `seller_type` (enum, section 1.5); `summary` text; `years_exporting` smallint; `default_quote_validity_days` smallint, default 30, range 1-365; `accepts_rfqs` boolean, default true; `response_time_hours` smallint; `is_published` boolean, default false; `published_at` timestamptz, required when `is_published` is true; `version`; `created_at`; `updated_at` | `companies` (1:1, cascade) |
+| `seller_capabilities` | Capability types the company offers. One row per type. | `id`; `capability_type` (enum, section 1.5); `description` text; unique (`company_id`, `capability_type`) | `companies` |
 | `seller_product_capabilities` | Categories, HS codes and optionally one product the seller can supply. | `id`; `category_id` (required); `hs_code_id` (optional); `product_id` (optional, must be a product of the same company); `notes` text; unique (`company_id`, `category_id`, `hs_code_id`, `product_id`), nulls not distinct | `product_categories`, `hs_codes`, `products` (composite, same company) |
 | `seller_export_markets` | Countries the seller exports to. | `company_id` + `country_id` (PK pair); `is_current` boolean, default true | `companies`, `countries` |
 | `seller_supply_regions` | Countries and optional states/provinces where goods are sourced or produced. | `id`; `country_id` (required); `state_province_id` (optional); unique (`company_id`, `country_id`, `state_province_id`), nulls not distinct | `countries`, `states_provinces` |
 | `seller_shipping_ports` | Ports the seller ships from. | `company_id` + `port_id` (PK pair); `is_primary` boolean, default false (no uniqueness constraint in schema) | `ports` |
 | `seller_incoterm_capabilities` | Incoterms the seller offers, optionally with port, named place and shipment mode. | `id`; `incoterm_id` (required); `port_id`; `named_place` text; `shipment_mode_id`; unique (`company_id`, `incoterm_id`, `port_id`, `named_place`, `shipment_mode_id`), nulls not distinct | `incoterms`, `ports`, `shipment_modes` |
 | `seller_certifications` | Certificates the company holds. | `id`; `certification_id` (required); `issuer_id` (optional); `certificate_number` text; `valid_from` date; `valid_until` date (valid_from <= valid_until when both set); `file_id` (file of the same company, module D) | `certifications`, `certification_issuers`, `files` (composite, same company) |
-| `seller_capacity_records` | Production or availability capacity. Scope is a category, a product, or both. Private. | `id`; `category_id` (optional); `product_id` (optional; at least one of category or product); `capacity_qty` numeric(20,6), must be > 0; `uom_id` (required); `period` (enum, section 1.4, default month); `valid_from` date; `valid_until` date; `notes` text | `product_categories`, `products` (composite), `units_of_measure` |
+| `seller_capacity_records` | Production or availability capacity. Scope is a category, a product, or both. Private. | `id`; `category_id` (optional); `product_id` (optional; at least one of category or product); `capacity_qty` numeric(20,6), must be > 0; `uom_id` (required); `period` (enum, section 1.5, default month); `valid_from` date; `valid_until` date; `notes` text | `product_categories`, `products` (composite), `units_of_measure` |
 | `seller_moq_records` | Minimum order quantity per category or product. Private. | `id`; `category_id` (optional); `product_id` (optional; at least one of category or product); `moq_qty` numeric(20,6), must be > 0; `uom_id` (required); `min_order_value` numeric(20,4), >= 0 (optional); `currency_id` (required when `min_order_value` is set) | `product_categories`, `products` (composite), `units_of_measure`, `currencies` |
-| `seller_lead_times` | Lead time range per category or product. Private. | `id`; `category_id` (optional); `product_id` (optional); `lead_time_type` (enum, section 1.4, default total); `min_days` smallint; `max_days` smallint (0 <= min_days <= max_days <= 730) | `product_categories`, `products` (composite) |
+| `seller_lead_times` | Lead time range per category or product. Private. | `id`; `category_id` (optional); `product_id` (optional); `lead_time_type` (enum, section 1.5, default total); `min_days` smallint; `max_days` smallint (0 <= min_days <= max_days <= 730) | `product_categories`, `products` (composite) |
 | `seller_packaging_capabilities` | Packaging types the seller can use. Private. | `company_id` + `packaging_type_id` (PK pair); `notes` text | `packaging_types` |
 | `seller_payment_methods` | Payment terms the seller accepts. Private. | `company_id` + `payment_term_id` (PK pair); `notes` text | `payment_terms` |
 | `seller_accepted_currencies` | Currencies the seller accepts. Private. | `company_id` + `currency_id` (PK pair) | `currencies` |
@@ -89,7 +89,7 @@ Sources: `backend/docs/DATABASE_REFERENCE.md` (sections G, H, I), `backend/docs/
 Write rules:
 - `seller_profile.manage` is required to write all 15 seller tables. `buyer_profile.manage` is required to write all 6 buyer tables.
 - **No delete** is allowed on `seller_trade_profiles`, `seller_trade_terms`, `buyer_profiles` and `buyer_trade_preferences`. The other 17 tables allow delete with the manage permission.
-- Publication: `is_published` = true requires `published_at` to be set (CHECK). No trigger sets `published_at`. The application must set it.
+- Publication: `is_published` = true requires `published_at` to be set (CHECK). No trigger sets `published_at` for seller profiles. The application must set it.
 - `accepts_rfqs` is not read by the visibility function `can_view_rfq` or by `can_quote_rfq`. Its effect is not defined in the sources (see section 5).
 - `default_quote_validity_days` is stored here. Its use in quotations is defined in module J, which is not covered here.
 
@@ -99,7 +99,7 @@ Write rules:
 - Identity block: `seller_type` (single select, required); `years_exporting`; `summary`; `response_time_hours`; `accepts_rfqs` (toggle); `default_quote_validity_days` (number 1-365, default 30).
 - Publication control: `is_published` toggle. Shows `published_at` and a preview of the public view (G-2). Off means invisible to other companies.
 - Capabilities section: multi-select `capability_type`; per-capability `description`.
-- Products section: rows of `category_id` (required), `hs_code_id`, `product_id` (picker of own products), `notes`.
+- Products section: rows of `category_id` (required), `hs_code_id`, `product_id` (picker of own products; archived products remain selectable here as references, see section 1.8), `notes`.
 - Markets and regions section: export markets (`country_id`, `is_current`); supply regions (`country_id`, `state_province_id`); shipping ports (`port_id`, `is_primary`).
 - Incoterms section: rows of `incoterm_id` (required), `port_id`, `named_place`, `shipment_mode_id`.
 - Certifications section: rows of `certification_id` (required), `issuer_id`, `certificate_number`, `valid_from`, `valid_until`, `file_id` (upload of an own company file).
@@ -127,6 +127,21 @@ Write rules:
 - Import requirements: rows of `requirement_type` (required); `certification_id` (required only when type is certification); `description` (required); `is_mandatory` (default on).
 - Trade preferences: `preferred_currency_id`, `preferred_incoterm_id`, `preferred_payment_term_id`, `preferred_shipment_mode_id`, `notes`.
 - Nothing on this screen is public. Matching workers read buyer and seller data (trade-profiles.ts header comment).
+
+### 1.8 Catalog records referenced by module G (migration 0007)
+
+Products and listings are owned by the catalog module (module F, not covered here). Module G references them through `product_id`. Their status rules changed in migration 0007.
+
+- `products.status` (CHECK `products_status_chk`): `draft`, `active`, `archived`, `suspended`.
+- `seller_product_listings.status` (CHECK): `draft`, `active`, `paused`, `archived`.
+- Transitions for non-trusted callers (trigger `guard_catalog_status`):
+  - products: draft to active or archived; active to archived; archived to draft.
+  - listings: the same transitions, plus active to paused, and paused to active or archived.
+  - Any other change is rejected.
+- `suspended` is a moderation action. Non-trusted callers cannot insert it, cannot set it, and cannot leave it. Trusted (system) callers bypass the guard.
+- `published_at` on `products` is set automatically the first time its status is active and `published_at` is empty.
+- No hard delete: the application role has no DELETE on `products` or `seller_product_listings`, and the policy spec gives the worker no delete either. Records are archived instead.
+- Visibility: other companies see a product or listing only when its status is `active` and its company is active (`is_public_company`). The owning company sees all its rows.
 
 ---
 
@@ -158,7 +173,7 @@ A buyer publishes a request for quotation (RFQ): what it wants (items and specif
 | `rfq_attachments` | Files attached to the RFQ. | `id`; `file_id` (unique, file of the same company); `title` (required) | `rfqs`, `files` (composite, same company) |
 | `rfq_invitations` | Direct invitation of one company to one RFQ. | `id`; `invited_company_id`; `invited_by_user_id`; `status` (enum, default pending); `message` text; `invited_at`; `responded_at`; unique (`rfq_id`, `invited_company_id`) | `rfqs`, `companies`, `users` |
 | `rfq_status_history` | Append-only log of RFQ status changes. | `id`; `from_status` (empty on creation); `to_status` (required); `actor_user_id`; `reason` text; `created_at` | `rfqs`, `users` |
-| `rfq_views` | One row per supplier view of an RFQ. | `id`; `company_id` (viewing company); `viewer_user_id`; `viewed_at` | `rfqs`, `companies`, `users` |
+| `rfq_views` | One row per supplier view of an RFQ. The owner sees the full rows. | `id`; `company_id` (viewing company); `viewer_user_id`; `viewed_at` | `rfqs`, `companies`, `users` |
 | `rfq_saved_records` | RFQs a user has saved, with a note. | `id`; `company_id`; `user_id`; `note` text; `saved_at`; unique (`company_id`, `user_id`, `rfq_id`) | `rfqs`, `companies`, `users` |
 | `rfq_clarifications` | Question and answer about an RFQ. | `id`; `rfq_id`; `rfq_company_id` (buyer); `asked_by_company_id`; `asked_by_user_id`; `question` (required); `answer` text; `answered_by_user_id`; `answered_at`; `is_public` boolean, default false; `created_at` | `rfqs`, `companies`, `users` |
 
@@ -170,7 +185,7 @@ A buyer publishes a request for quotation (RFQ): what it wants (items and specif
 - `rfq_visibility_rules` operand rule (CHECK): allow_country and block_country use `country_id` only; min_verification uses `verification_level` only; seller_type uses `seller_type` only.
 - `rfq_visibility_rules.verification_level` values (**TS only**, no database CHECK on this column): `email`, `phone`, `business_registration`, `business_address`, `authorized_representative`, `documents_reviewed`, `independent_check`
 - `rfq_visibility_rules.seller_type` values (**TS only**, no database CHECK on this column): same seven values as `seller_trade_profiles.seller_type` (section 1.5)
-- `rfq_invitations.status` (CHECK `rfq_invitations_status_chk`): `pending`, `viewed`, `declined`, `quoted`
+- `rfq_invitations.status` (CHECK `rfq_invitations_status_chk`): `pending`, `viewed`, `declined`, `quoted`. Allowed transitions are in section 2.9 (trigger, migration 0007).
 - `rfq_origin_preferences.preference` (CHECK): `preferred`, `required`, `excluded` (default `preferred`)
 - `rfq_required_documents.document_type` (CHECK): `commercial_invoice`, `packing_list`, `certificate_of_origin`, `bill_of_lading`, `phytosanitary_certificate`, `fumigation_certificate`, `health_certificate`, `certificate_of_analysis`, `msds`, `insurance_certificate`, `other`
 - `rfq_clarifications` rule (CHECK): `answer` is null if and only if `answered_at` is null. The asker company must differ from the owner company.
@@ -184,7 +199,7 @@ A buyer publishes a request for quotation (RFQ): what it wants (items and specif
 
 **Immutable columns** (trigger, for everyone except trusted callers): `company_id`, `reference_no`, `created_by_user_id`.
 
-**Allowed transitions** (complete list from trigger `app.guard_rfq`):
+**Allowed transitions** (complete list from trigger `app.guard_rfq`; migration 0007 does not change it):
 
 | From | To | Database conditions | Who may trigger (as enforced) |
 |---|---|---|---|
@@ -218,12 +233,12 @@ A buyer publishes a request for quotation (RFQ): what it wants (items and specif
 
 ### 2.6 Visibility rules: who may see an RFQ
 
-Supplier company **p** can see RFQ **r** only if all of the following hold (function `app.can_view_rfq`):
+Supplier company p can see RFQ r only if all of the following hold (function `app.can_view_rfq`):
 1. `r.status` = published.
 2. `r.expires_at` is later than now.
 3. p is not the owning company.
 4. p has status `active`.
-5. Visibility: `r.visibility` = public, **or** `r.visibility` = invited and an `rfq_invitations` row exists for p (any invitation status counts). `private` gives no supplier access: the function returns false for every supplier.
+5. Visibility: `r.visibility` = public, **or** `r.visibility` = invited and an `rfq_invitations` row exists for p (any invitation status counts). `private` gives no supplier access: the function returns false for every supplier. Migration 0007 documents `private` as owner-only, with no supplier path (not listed, not matched, not invitable). Its behaviour is unchanged.
 6. Country rules: no `block_country` rule matches the country of p. If any `allow_country` rules exist, the country of p must match one of them.
 7. Verification rules: for every `min_verification` rule, p must have a `company_verification_levels` row with that `level`, status `verified`, and `expires_at` empty or in the future.
 8. Seller-type rules: if any `seller_type` rules exist, p must have a `seller_trade_profiles` row whose `seller_type` equals one of the rule values. (The function does not check `is_published` here.)
@@ -252,10 +267,12 @@ Base-table reads granted to suppliers:
 - `rfq_saved_records`: the user's own rows.
 - `rfq_invitations`: rows addressed to the supplier company.
 - `rfq_views`: insert and read own rows.
+- `rfq_trade_requirements`, `rfq_required_documents`, `rfq_certification_requirements` (migration 0007): rows of RFQs in the supplier's `app.public_rfqs`. This includes RFQs the supplier has quoted on, even after they close.
+- `rfq_supplier_matches` and `rfq_match_reasons`: rows only while the RFQ is in the supplier's `app.public_rfqs` (section 3.6).
 
-**Not readable by suppliers** (base-table policy is owner-only): `rfq_trade_requirements`, `rfq_payment_preferences`, `rfq_origin_preferences`, `rfq_required_documents`, `rfq_certification_requirements`, `rfq_visibility_rules`, `rfq_status_history`, `rfq_items` and `rfq_destinations` (base tables; suppliers use the projections above).
+**Not readable by suppliers:** `rfq_payment_preferences`, `rfq_origin_preferences`, `rfq_visibility_rules`, `rfq_status_history`, `rfq_items` and `rfq_destinations` (base tables; suppliers use the projections above).
 
-**Buyer (owning company) reads:** `rfqs` and all child tables where `company_id` is the active company; `rfq_status_history`; `rfq_invitations` sent by the company; `rfq_clarifications` on its RFQs; `rfq_views` (see section 5, item 3); match runs and supplier matches for its RFQs (section 3).
+**Buyer (owning company) reads:** `rfqs` and all child tables where `company_id` is the active company; `rfq_status_history`; `rfq_invitations` sent by the company; `rfq_clarifications` on its RFQs; `rfq_views` (full rows of its RFQs, section 6); match runs and supplier matches for its RFQs (section 3).
 
 ### 2.8 Clarifications (Q&A)
 
@@ -267,9 +284,14 @@ Base-table reads granted to suppliers:
 ### 2.9 Invitations
 
 - **Create / delete:** the owner with `rfq.manage` inserts `invited_company_id`, `message`, and `invited_by_user_id`. One invitation per (RFQ, company). Delete is allowed for the owner.
-- **Respond:** users of the invited company can read the row and update `status` and `responded_at`. No database trigger restricts status transitions (section 5, item 4).
-- **Status values:** `pending`, `viewed`, `declined`, `quoted`. The CHECK does not include an accepted value.
-- **Effect on visibility:** an `invited` RFQ is visible to the invited company whatever the invitation status. Declining does not remove access.
+- **Respond (invited company only):** users of the invited company update `status` and `responded_at`. Trigger `guard_rfq_invitation_status` (migration 0007) rejects every change that is not made by the invited company, and every status change that is not listed below. System callers bypass the trigger (`app.is_system_caller()`: trusted roles and the worker role). The owner therefore cannot change `status` or `responded_at`. The invitee's update also requires the `quotation.create` permission (RLS, migration 0007).
+- **Allowed transitions (trigger):**
+  - pending to viewed or declined.
+  - viewed to declined or quoted.
+  - `declined` and `quoted` are final.
+  - pending directly to quoted is rejected.
+- **Status values:** `pending`, `viewed`, `declined`, `quoted` (CHECK). The CHECK does not include an accepted value.
+- **Effect on visibility:** an `invited` RFQ is visible to the invited company whatever the invitation status. Declining does not remove access (section 5, item 1).
 - **Visibility of rows:** the owner sees all invitations of its RFQs; the invited company sees the invitations addressed to it.
 
 ### 2.10 Screens: module H
@@ -298,7 +320,7 @@ Base-table reads granted to suppliers:
 **Screen H-3. RFQ detail (buyer).**
 - Header: `reference_no`, `title`, status badge, `visibility`, `published_at`, `expires_at`, `quote_deadline_at`, `closed_at`, `close_reason`.
 - Status actions: show only the transitions in section 2.5 that apply to the current status. Show "Pause to edit" when published. Show a read-only banner when content is locked.
-- Tabs: Items and specifications; Destinations; Trade requirements (including payment and origin); Required documents; Required certifications; Visibility rules; Attachments; Invitations; Clarifications; Views; Matched suppliers (screen I-1); History.
+- Tabs: Items and specifications; Destinations; Trade requirements (including payment and origin); Required documents; Required certifications; Visibility rules; Attachments; Invitations; Clarifications; Views (full rows: viewing company, viewer user, time); Matched suppliers (screen I-1); History.
 
 **Screen H-4. Clarifications inbox (buyer).**
 - List per RFQ: asking company, `question`, `created_at`, answered or not.
@@ -306,7 +328,7 @@ Base-table reads granted to suppliers:
 
 **Screen H-5. Invitations (buyer).**
 - Invite form: company picker (`invited_company_id`; cannot be the owner), `message`.
-- List: invited company, `status`, `invited_at`, `responded_at`. Action: delete invitation.
+- List: invited company, `status`, `invited_at`, `responded_at`. Action: delete invitation. The buyer cannot change `status` or `responded_at`.
 
 **Screen H-6. Views and history (buyer).**
 - Views list: viewing company (`company_id`), `viewer_user_id`, `viewed_at`.
@@ -320,14 +342,15 @@ Base-table reads granted to suppliers:
 **Screen H-8. Supplier RFQ detail.**
 - Header from `app.public_rfqs`: `title`, `description`, `reference_no`, deadlines (`quote_deadline_at` shown as closed once past), `expires_at`, `allow_partial_quotes`.
 - Items from `app.public_rfq_items` (no target price). Specifications from `app.public_rfq_specifications`. Destinations from `app.public_rfq_destinations`.
+- Requirements (readable for RFQs in the supplier's `app.public_rfqs`, migration 0007): required documents (`document_type`), required certifications (`certification_id`, `rfq_item_id`, `is_mandatory`), trade requirements (`packaging_type_id`, `packaging_notes`, `shipment_mode_id`, `inspection_required`, `samples_required`, `notes`).
+- Not shown to suppliers: visibility rules, payment preferences and origin preferences (buyer-only).
 - Attachments: `rfq_attachments` rows (`title`, file link).
 - Public Q&A: clarifications with `is_public` true.
 - Actions: ask a question (`question`); save RFQ with `note`; invitation banner when an invitation row exists (with its `status`). Quote action leads to module J.
-- Required certifications and documents cannot be shown: suppliers cannot read those tables (section 5, item 1).
 
 **Screen H-9. Supplier invitations inbox.**
 - List of invitations addressed to the company: RFQ `reference_no` and `title` (from `public_rfqs`), `message`, `invited_at`, `status`, `responded_at`.
-- Actions: change `status` (one of pending, viewed, declined, quoted) and set `responded_at`.
+- Actions: from pending, move to viewed or declined; from viewed, move to declined or quoted. Declined and quoted are final (trigger). Set `responded_at` with the status change.
 
 **Screen H-10. Saved RFQs (supplier user).**
 - List of `rfq_saved_records` for the user: RFQ, `note` (editable), `saved_at`. Action: remove.
@@ -363,7 +386,7 @@ For each published RFQ, a worker ranks candidate suppliers and records the reaso
 - `supplier_match_feedback.feedback` (CHECK): `relevant`, `not_relevant`, `spam`, `already_supplied`
 - `rfq_supplier_matches.score` (CHECK): between 0 and 100
 - `rfq_match_reasons.reason_code`: free text, **no CHECK**. Examples in the schema comment: `category_match`, `hs_match`, `moq_ok`, `capacity_ok`, `incoterm_ok`, and "...". The full code list is not defined in the sources.
-- `rfq_match_reasons.detail` may reference private supplier data such as capacity (schema comment). Only that supplier can read it.
+- `rfq_match_reasons.detail` may reference private supplier data such as capacity (schema comment). Only that supplier can read it, and only while the RFQ is visible to it (section 3.6).
 
 ### 3.5 Matching flow
 
@@ -381,14 +404,14 @@ For each published RFQ, a worker ranks candidate suppliers and records the reaso
 | Data | Buyer (RFQ owner company) | Supplier (match subject company) |
 |---|---|---|
 | `rfq_match_runs` | rows of own company: `status`, `algorithm_version`, `candidate_count`, `error`, `started_at`, `finished_at` | none |
-| `rfq_supplier_matches` | rows where `buyer_company_id` is the active company: `supplier_company_id`, `score`, `rank`, `is_eligible`, `status` | rows where `supplier_company_id` is the active company: `buyer_company_id`, `rfq_id`, `score`, `rank`, `is_eligible`, `status` (updatable) |
-| `rfq_match_reasons` | none | reasons of own matches: `reason_code`, `passed`, `weight`, `detail` |
+| `rfq_supplier_matches` | rows where `buyer_company_id` is the active company: `supplier_company_id`, `score`, `rank`, `is_eligible`, `status` | rows where `supplier_company_id` is the active company **and** the RFQ is in the company's `app.public_rfqs` (migration 0007): `buyer_company_id`, `rfq_id`, `score`, `rank`, `is_eligible`, `status` (updatable) |
+| `rfq_match_reasons` | none | reasons of own matches, only while the match row is visible (same RFQ gate): `reason_code`, `passed`, `weight`, `detail` |
 | `supplier_match_feedback` | none | own feedback rows |
 | `supplier_match_preferences` | none | own rows (read, insert, update, delete with `seller_profile.manage`) |
 
 Notes:
 - The buyer never sees reasons or feedback.
-- The supplier-side match policy does not check RFQ visibility. A supplier may hold a match row for an RFQ it cannot see (see section 5, item 6).
+- A supplier sees a match row only while its RFQ is in the supplier's `app.public_rfqs` (migration 0007). Match rows therefore never reveal RFQs the supplier cannot see. Match rows for RFQs the supplier has quoted on remain visible, because `app.public_rfqs` keeps those RFQs.
 - Platform workers read and write matching data (`rfq_match_runs`: insert and update; `rfq_supplier_matches`: insert and update; `rfq_match_reasons`: insert only).
 
 ### 3.7 Screens: module I
@@ -400,7 +423,7 @@ Notes:
 - No reasons are shown to the buyer.
 
 **Screen I-2. Supplier match inbox (supplier).**
-- List of own matches: RFQ context (`rfq_id`, `buyer_company_id`; RFQ title only if visible), `score`, `rank`, `status`, `created_at`.
+- List of own matches: RFQ context (`rfq_id`, `buyer_company_id`; the RFQ is always visible for a match row, because the row requires it in `app.public_rfqs`), `score`, `rank`, `status`, `created_at`.
 - Expand a match: reasons table (`reason_code`, `passed`, `weight`, `detail`).
 - Actions: change `status` (suggested, notified, viewed, dismissed, quoted); feedback form (`feedback` one of relevant, not_relevant, spam, already_supplied; `comment`).
 
@@ -426,20 +449,28 @@ Eligibility call (ARCHITECTURE_ASSESSMENT section 3): the quotation service asks
 
 ---
 
-## 5. Open points for the designer (confirmed in the sources)
+## 5. Open points for the designer (still open in the sources)
 
-1. **Suppliers cannot read required certifications, required documents, trade requirements, payment preferences, origin preferences or visibility rules.** These tables are owner-only. No supplier projection exists for them. Only attachments are readable. Decide whether suppliers should see these, which requires a projection.
-2. **`private` visibility gives no supplier access** (`can_view_rfq` returns false for all suppliers). Only the owner sees such an RFQ, and suppliers that already quoted keep access. The sources define no other supplier path for `private`.
-3. **`rfq_views` read policy differs between sources.** The SQL policy lets the owner read full view rows (viewer company, viewer user, time) for its RFQs. The schema comment says buyers read only aggregates. Treat as an open decision.
-4. **Invitation status is not governed by the database.** The CHECK allows `pending`, `viewed`, `declined`, `quoted`. No trigger orders transitions. The invited company can set any allowed value.
-5. **Invitation status does not change visibility.** An invited RFQ is visible to the invited company even after decline.
-6. **Match rows are not gated by RFQ visibility.** The supplier policy on `rfq_supplier_matches` checks only the supplier company. A supplier can hold a match whose RFQ it cannot view (for example when `is_eligible` is false). The UI must handle a match with no visible RFQ.
-7. **Matching semantics are undefined.** `is_eligible`, `rank`, `weight` and the reason codes have no defined formula or code list in the sources.
-8. **Expiry is time-based for suppliers, but the job that sets `expired` is not defined.** `can_view_rfq` stops showing an RFQ at `expires_at` even while its status is still published. The worker is allowed to set `expired` once `expires_at` has passed. The sources do not state the job.
-9. **Published RFQs can change some header fields.** The trigger locks only `title`, `primary_category_id`, `visibility` and `currency_id` after publication. `description`, `quote_deadline_at`, `expires_at` and `allow_partial_quotes` remain editable. The sources do not decide whether that is intended.
-10. **`accepts_rfqs` has no defined effect** on visibility or quoting in the sources.
-11. **`published_at` is not set by a trigger** for seller profiles. The application must set it when publishing (CHECK).
-12. **`seller_shipping_ports.is_primary` has no uniqueness constraint.** Several primary ports are allowed by the schema.
-13. **Rule-type value lists** for `rfq_visibility_rules.verification_level` and `rfq_visibility_rules.seller_type` are checked only in application code (TS only). The database accepts any text in those columns.
-14. **Free-text reason fields** (`rfqs.close_reason`, `rfq_status_history.reason`) have no trigger support. They are filled only by the application.
-15. **Module ownership count.** ARCHITECTURE_ASSESSMENT section 4 says 14 seller tables and 6 buyer tables (20). The reference lists 21 in total (15 seller, 6 buyer). This document uses 21.
+1. **Invitation decline does not change visibility.** An invited RFQ is visible to the invited company even after decline. The rule in `can_view_rfq` checks only that an invitation row exists.
+2. **Matching semantics are undefined.** `is_eligible`, `rank`, `weight` and the reason codes have no defined formula or code list in the sources.
+3. **Expiry is time-based for suppliers, but the job that sets `expired` is not defined.** `can_view_rfq` stops showing an RFQ at `expires_at` even while its status is still published. The worker is allowed to set `expired` once `expires_at` has passed. The sources do not state the job.
+4. **Published RFQs can change some header fields.** The trigger locks only `title`, `primary_category_id`, `visibility` and `currency_id` after publication. `description`, `quote_deadline_at`, `expires_at` and `allow_partial_quotes` remain editable. The sources do not decide whether that is intended.
+5. **`accepts_rfqs` has no defined effect** on visibility or quoting in the sources.
+6. **`published_at` is not set by a trigger** for seller profiles. The application must set it when publishing (CHECK). (Products get `published_at` from a trigger; seller profiles do not.)
+7. **`seller_shipping_ports.is_primary` has no uniqueness constraint.** Several primary ports are allowed by the schema.
+8. **Rule-type value lists** for `rfq_visibility_rules.verification_level` and `rfq_visibility_rules.seller_type` are checked only in application code (TS only). The database accepts any text in those columns.
+9. **Free-text reason fields** (`rfqs.close_reason`, `rfq_status_history.reason`) have no trigger support. They are filled only by the application.
+10. **Module ownership count.** ARCHITECTURE_ASSESSMENT section 4 says 14 seller tables and 6 buyer tables (20). The reference lists 21 in total (15 seller, 6 buyer). This document uses 21.
+
+---
+
+## 6. Resolved by migration 0007
+
+Migration `0007_review_fixes.sql` is additive. Earlier migrations were not edited. The policy spec `spec.ts` describes the final state.
+
+- **Match rows follow RFQ visibility.** `rfq_supplier_matches` and `rfq_match_reasons` are visible to a supplier only while the RFQ is in the supplier's `app.public_rfqs`. Section 3.6 and screen I-2 reflect this.
+- **Suppliers read what a public RFQ requires.** `rfq_trade_requirements`, `rfq_required_documents` and `rfq_certification_requirements` are readable by suppliers for RFQs in their `app.public_rfqs`. `rfq_payment_preferences`, `rfq_origin_preferences` and `rfq_visibility_rules` remain owner-only. Sections 2.7 and H-8 reflect this.
+- **Invitation responses are governed.** Trigger `guard_rfq_invitation_status` enforces the transitions in section 2.9. Only the invited company can respond, and the invitee's write also needs `quotation.create`. Declined and quoted are final.
+- **Catalog records are archived, not deleted.** The application role has no DELETE on `products` or `seller_product_listings`. Status transitions are governed by trigger `guard_catalog_status`, and `suspended` is moderation-only. Section 1.8 lists the graphs.
+- **`private` RFQ visibility is documented as owner-only** (comment on `rfqs.visibility`). There is still no supplier access path. Section 2.6 reflects this.
+- **`rfq_views` owner access is documented.** The comment states that the owner sees full rows. The policy itself is unchanged, and section 2.3 and 2.7 reflect this.

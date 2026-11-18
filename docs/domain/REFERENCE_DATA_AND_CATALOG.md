@@ -29,7 +29,7 @@
 | Seeded roles with `catalog.manage` | `owner` (100), `admin` (80), `manager` (60), `member` (40). `viewer` (20) has no catalog write. |
 | Optimistic concurrency (F) | `products.version` and `seller_product_listings.version` (integer, default 1) increase by 1 on every UPDATE (trigger). Saves must send the version read; a mismatch means someone else changed the row. |
 | Automatic timestamps | `updated_at` is set by trigger on UPDATE. |
-| Delete grants (F) | Grants allow the app role DELETE on `products` and `seller_product_listings` (own company, `catalog.manage`). The design principle says business records are not hard-deleted (`DATABASE_DESIGN.md` §2). **Open point:** Delete vs Archive. See §5. |
+| Delete (F) | **No delete.** Migration `0007` revoked DELETE on `products` and `seller_product_listings` from the app role and dropped their delete policies. Products and listings are archived instead (see §3.5). |
 
 ---
 
@@ -184,15 +184,50 @@ A supplier company publishes **products** (what it makes or sells), classifies t
 | `product_documents.document_type` | `datasheet`, `catalog`, `test_report`, `certificate`, `msds`, `other` | none (required) |
 | `product_specification_definitions.data_type` | `text`, `number`, `boolean`, `enum`, `range` | none (required) |
 
+### 3.4a Status lifecycle (enforced by trigger `guard_catalog_status`, migration `0007`)
+
+Applies to every non-trusted write. Trusted callers (database roles `saudaro_authz`, `saudaro_migrator`, and superusers) skip the transition rules.
+
+**Products (`products.status`)**
+
+| From | To | Allowed for app roles |
+|---|---|---|
+| (insert) | `draft`, `active`, `archived` | yes; inserting `suspended` is rejected |
+| `draft` | `active`, `archived` | yes |
+| `active` | `archived` | yes |
+| `archived` | `draft` | yes (restore) |
+| any | `suspended` | no (moderation only) |
+| `suspended` | any | no (moderation only) |
+
+Not allowed for app roles: `active` → `draft`, `archived` → `active` directly, and any change to or from `suspended`.
+
+**Listings (`seller_product_listings.status`)**
+
+| From | To | Allowed for app roles |
+|---|---|---|
+| (insert) | `draft`, `active`, `paused`, `archived` | yes |
+| `draft` | `active`, `archived` | yes |
+| `active` | `paused`, `archived` | yes |
+| `paused` | `active`, `archived` | yes |
+| `archived` | `draft` | yes (restore) |
+
+Not allowed for app roles: `active` → `draft`, `paused` → `draft`, and any direct `draft` → `paused`.
+
+The trigger checks only changes of `status`. Other column updates are not restricted by it.
+
+**Publication timestamp:** when a product row is written with `status = active` and `published_at` is null, the trigger sets `published_at` to the current time (for every caller). Re-activation after archive keeps the original `published_at`, because it is set only when null.
+
+**Suspension:** `suspended` is a moderation state. Application roles cannot set it and cannot leave it. `seller_product_listings` has no `suspended` value.
+
 ### 3.5 Business rules and lifecycle (F)
 
 **Product (`products`)**
 
 - Status set: `draft`, `active`, `archived`, `suspended`.
-- A product with `status = active` must have `published_at` set (CHECK `products_published_chk`).
+- A product with `status = active` must have `published_at` set (CHECK `products_published_chk`). The trigger sets it on activation (§3.4a).
 - Slug is unique per company (`company_id`, `slug`).
 - Required on create: `name`, `slug`, `primary_category_id`, `base_uom_id`, `company_id`.
-- The app can change status freely (CHECK only). **No database trigger enforces a transition graph or sets `published_at`.** See §5.
+- Status changes follow the graph in §3.4a (enforced by trigger). Rows cannot be deleted by app roles; archive is the removal path.
 - Visibility:
   - The owning company sees all its products in every status.
   - Other companies see a product only when `status = active` **and** the owning company's `companies.status` is `active` (helper `app.is_public_company`).
@@ -202,8 +237,8 @@ A supplier company publishes **products** (what it makes or sells), classifies t
 
 **Listing (`seller_product_listings`)**
 
-- Status set: `draft`, `active`, `paused`, `archived`.
-- Visibility: owning company sees all; other companies see only `status = active` when the owning company is `active`.
+- Status set: `draft`, `active`, `paused`, `archived`. Transitions follow §3.4a (`active` ⇄ `paused`; archive from `draft`, `active` or `paused`; restore from `archived` to `draft`). No delete.
+- Visibility: owning company sees all; other companies see only `status = active` when the owning company is `active`. A `paused` listing is hidden from other companies.
 - The schema has **no unique constraint on (`company_id`, `product_id`)**. More than one listing per product is allowed by the schema.
 - Prices: if both set, `price_min ≤ price_max`. If any price is set, `currency_id` is required. Prices and `monthly_capacity` must be ≥ 0.
 - Minimum order: if `min_order_qty` is set it must be > 0 and `moq_uom_id` is required.
@@ -263,7 +298,7 @@ A supplier company publishes **products** (what it makes or sells), classifies t
 **Concurrency and writes**
 
 - `products.version` and `seller_product_listings.version` are bumped on every UPDATE. Saves must include the version read.
-- App writes (insert, update, delete) on all F tables need `catalog.manage` and an active company whose status is `draft` or `active`.
+- App writes on all F tables need `catalog.manage` and a writable company (status `draft` or `active`). Insert and update apply to every F table. Delete applies to child tables only; `products` and `seller_product_listings` have no app-role delete (migration `0007`).
 
 ---
 
@@ -281,7 +316,8 @@ Implied by the schema only. Each item lists the data it needs.
   - Manufacturer: `manufacturer_name` (free text) or `manufacturer_company_id` (company picker).
   - Origin: `origin_country_id` (country picker).
   - Classification: `primary_category_id` (required category tree), `base_uom_id` (required, unit picker).
-  - Status: `status` with `published_at` shown when status is `active`.
+  - Status: `status` with `published_at` shown when status is `active`. Show only the transitions allowed in §3.4a. Show `suspended` as a read-only state with no action (set by moderation).
+  - Actions: Save, Activate (`draft` → `active`), Archive (from `draft` or `active`), Restore (from `archived` to `draft`). **No Delete action.**
   - Save with `version` for conflict detection.
 - **Categories panel:** multi-select of categories (`product_categories_mapping`) with a primary flag (`is_primary`).
 - **HS codes panel:** multi-select of `hs_codes` (search by code prefix and description) with a primary flag (`product_hs_codes.is_primary`).
@@ -299,7 +335,7 @@ Implied by the schema only. Each item lists the data it needs.
 - **Documents panel:** upload to files and link via `product_documents.file_id`; `document_type` (6 values); `title`.
 - **Certifications panel:** `certification_id` (picker grouped by category), `issuer_id` (picker), `certificate_number`, `valid_from`, `valid_until` (date pickers), certificate file (`file_id`, optional). Show expiry status derived from `valid_until`.
 - **Listings panel (per product):**
-  - Status (`draft`, `active`, `paused`, `archived`).
+  - Status (`draft`, `active`, `paused`, `archived`), with actions Pause (`active` → `paused`), Resume (`paused` → `active`), Archive, Restore (`archived` → `draft`). **No Delete action.**
   - Minimum order: `min_order_qty` and `moq_uom_id`.
   - Price range: `price_min`, `price_max`, `currency_id`.
   - Lead time: `lead_time_days_min`, `lead_time_days_max` (days).
@@ -325,19 +361,27 @@ Implied by the schema only. Each item lists the data it needs.
 
 ## 5. Gaps, decisions and uncertainties
 
+### 5.1 Resolved by migration 0007
+
+Source: `backend/src/database/migrations/0007_review_fixes.sql`; `backend/docs/DATABASE_DESIGN.md` §2.
+
+- App roles can no longer delete products or listings. Use archive (§3.4a).
+- Status transitions for products and listings are enforced by trigger (§3.4a).
+- `published_at` is set automatically on activation (§3.4a).
+- `suspended` is moderation-only (§3.4a).
+
+### 5.2 Open uncertainties
+
 | # | Item | Detail |
 |---|---|---|
 | 1 | Module A owner | Not assigned in `ARCHITECTURE_ASSESSMENT.md` §4 for countries, currencies, units, ports, Incoterms, payment terms, packaging, shipment modes, languages, states/provinces and cities. ADR-004 says a versioned reference package. |
-| 2 | Product and listing status transitions | No trigger or CHECK defines allowed transitions (e.g. `suspended` → `active`, who can archive). Only the value set and "active requires `published_at`" are enforced. The transition graph needs a product decision. |
-| 3 | Setting `published_at` | No trigger sets it. The sources do not say whether the app or the user sets it. |
-| 4 | Delete vs archive | App role has DELETE on `products` and `seller_product_listings`, but the design says business records are not hard-deleted. Decide whether the UI offers Delete, Archive, or both. |
-| 5 | Multiple listings per product | Allowed by schema (no unique on `company_id`, `product_id`). Confirm whether one product should have one listing per company. |
-| 6 | Primary category consistency | `products.primary_category_id` and `product_categories_mapping.is_primary` are not linked by any constraint. |
-| 7 | Primary HS code and primary image rules | `product_hs_codes.is_primary` has no uniqueness rule. `product_images.is_primary` is unique per product (partial index). |
-| 8 | Specification scoping | Definitions are global or per category. The schema does not say which definitions apply to a product whose category has no definitions; the UI must decide how to show the form (assumed: category definitions plus global). |
-| 9 | Empty seeds | No specification definitions, cities or states/provinces are seeded. Spec forms and location pickers will be empty until curated data is loaded. |
-| 10 | Seed scope | Starter sets only (see §2.7). Production imports full ISO, UN/LOCODE and WCO datasets (`DATABASE_DESIGN.md` §6). Do not design fixed list sizes from the seed counts. |
-| 11 | Incoterm years | Seed has version 2020 only. The picker must support `version_year` if other years are added. |
-| 12 | Port types | Seed has `sea` ports only; `air`, `inland`, `rail`, `road` are valid values with no seed rows. |
-| 13 | Language direction | `languages.is_rtl` is stored; the sources do not define how the UI applies it. |
-| 14 | Public visibility of company | Product visibility depends on the owning company's `companies.status = active` (Module C). The company statuses are defined in Module C. |
+| 2 | Multiple listings per product | Allowed by schema (no unique on `company_id`, `product_id`). Confirm whether one product should have one listing per company. |
+| 3 | Primary category consistency | `products.primary_category_id` and `product_categories_mapping.is_primary` are not linked by any constraint. |
+| 4 | Primary HS code and primary image rules | `product_hs_codes.is_primary` has no uniqueness rule. `product_images.is_primary` is unique per product (partial index). |
+| 5 | Specification scoping | Definitions are global or per category. The schema does not say which definitions apply to a product whose category has no definitions; the UI must decide how to show the form (assumed: category definitions plus global). |
+| 6 | Empty seeds | No specification definitions, cities or states/provinces are seeded. Spec forms and location pickers will be empty until curated data is loaded. |
+| 7 | Seed scope | Starter sets only (see §2.7). Production imports full ISO, UN/LOCODE and WCO datasets (`DATABASE_DESIGN.md` §6). Do not design fixed list sizes from the seed counts. |
+| 8 | Incoterm years | Seed has version 2020 only. The picker must support `version_year` if other years are added. |
+| 9 | Port types | Seed has `sea` ports only; `air`, `inland`, `rail`, `road` are valid values with no seed rows. |
+| 10 | Language direction | `languages.is_rtl` is stored; the sources do not define how the UI applies it. |
+| 11 | Public visibility of company | Product visibility depends on the owning company's `companies.status = active` (Module C). The company statuses are defined in Module C. |

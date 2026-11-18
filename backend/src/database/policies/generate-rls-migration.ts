@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { getTableName, is } from 'drizzle-orm';
 import { PgTable } from 'drizzle-orm/pg-core';
 import * as schema from '../schema/index.ts';
-import { SPEC, type TablePolicy } from './spec.ts';
+import { BASELINE_0005, SPEC, type TablePolicy } from './spec.ts';
 
 /**
  * Generates migrations/0005_rls_policies_and_grants.sql from SPEC. Deterministic output: the

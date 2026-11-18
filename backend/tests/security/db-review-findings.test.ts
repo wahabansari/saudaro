@@ -261,7 +261,9 @@ describe('rfq_invitations responses', () => {
     const i = await invitation();
     const viewer = await w.user();
     await w.member(i.S, viewer, 'viewer');
-    const r = await as(pool, { userId: viewer, companyId: i.S }, (tx) => tx.client.query(set(i.id, 'viewed')));
+    const r = await as(pool, { userId: viewer, companyId: i.S }, (tx) =>
+      tx.client.query(set(i.id, 'viewed')),
+    );
     expect(r.rowCount).toBe(0); // RLS hides the row from the update
     await w.admin.query("update rfq_invitations set status = 'quoted' where id = $1", [i.id]);
     expect(await state(i.id)).toBe('quoted');

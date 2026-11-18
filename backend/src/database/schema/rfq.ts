@@ -67,6 +67,7 @@ export const rfqs = pgTable(
     description: text(),
     primaryCategoryId: fk(() => productCategories.id),
     status: enumText(RFQ_STATUS).notNull().default('draft'),
+    // public = eligible suppliers; invited = invited suppliers only; private = owner-only (no supplier path).
     visibility: enumText(RFQ_VISIBILITY).notNull().default('public'),
     currencyId: fkOpt(() => currencies.id),
     allowPartialQuotes: boolean().notNull().default(true),
@@ -387,7 +388,7 @@ export const rfqStatusHistory = pgTable(
   ],
 );
 
-/** company_id = the VIEWING company (supplier side). Buyers read only aggregates via the RFQ owner policy. */
+/** company_id = the VIEWING company (supplier side). The RFQ owner reads the full rows (who viewed, when) via the owner policy. */
 export const rfqViews = pgTable(
   'rfq_views',
   {

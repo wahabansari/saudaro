@@ -1579,7 +1579,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 - app read: `company_id = ACTIVE_CO OR (status = 'active' AND (select app.is_public_company(company_id)))`
 - app insert: `company_id = WRITABLE_CO AND can(catalog.manage)`
 - app update: `company_id = WRITABLE_CO AND can(catalog.manage)`
-- app delete: `company_id = WRITABLE_CO AND can(catalog.manage)`
+- app delete: **none**
 - other roles: worker `s`
 
 #### `seller_product_listings`
@@ -1618,7 +1618,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 - app read: `company_id = ACTIVE_CO OR (status = 'active' AND (select app.is_public_company(company_id)))`
 - app insert: `company_id = WRITABLE_CO AND can(catalog.manage)`
 - app update: `company_id = WRITABLE_CO AND can(catalog.manage)`
-- app delete: `company_id = WRITABLE_CO AND can(catalog.manage)`
+- app delete: **none**
 - other roles: worker `s`
 
 ## G. Seller trade profile and buyer profile (21 tables)
@@ -2151,7 +2151,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 **Indexes:** `ix_rfq_certification_requirements_cert`
 
 **Access (RLS):**
-- app read: `company_id = ACTIVE_CO`
+- app read: `company_id = ACTIVE_CO OR (exists (select 1 from app.public_rfqs p where p.id = rfq_id))`
 - app insert: `company_id = WRITABLE_CO AND can(rfq.create)`
 - app update: `company_id = WRITABLE_CO AND can(rfq.create)`
 - app delete: `company_id = WRITABLE_CO AND can(rfq.create)`
@@ -2239,7 +2239,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 **Access (RLS):**
 - app read: `company_id = ACTIVE_CO OR invited_company_id = ACTIVE_CO`
 - app insert: `company_id = WRITABLE_CO AND can(rfq.manage)`
-- app update: `company_id = WRITABLE_CO AND can(rfq.manage) OR invited_company_id = WRITABLE_CO`
+- app update: `company_id = WRITABLE_CO AND can(rfq.manage) OR (invited_company_id = WRITABLE_CO AND can(quotation.create))`
 - app delete: `company_id = WRITABLE_CO AND can(rfq.manage)`
 - updatable columns: status, responded_at
 - other roles: worker `s`, definer `s`
@@ -2331,7 +2331,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 **Checks:** `rfq_required_documents_type_chk`
 
 **Access (RLS):**
-- app read: `company_id = ACTIVE_CO`
+- app read: `company_id = ACTIVE_CO OR (exists (select 1 from app.public_rfqs p where p.id = rfq_id))`
 - app insert: `company_id = WRITABLE_CO AND can(rfq.create)`
 - app update: `company_id = WRITABLE_CO AND can(rfq.create)`
 - app delete: `company_id = WRITABLE_CO AND can(rfq.create)`
@@ -2433,7 +2433,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 **Foreign keys:** `packaging_type_id` → `packaging_types(id)` on delete restrict; `shipment_mode_id` → `shipment_modes(id)` on delete restrict; `rfq_id, company_id` → `rfqs(id, company_id)` on delete cascade
 
 **Access (RLS):**
-- app read: `company_id = ACTIVE_CO`
+- app read: `company_id = ACTIVE_CO OR (exists (select 1 from app.public_rfqs p where p.id = rfq_id))`
 - app insert: `company_id = WRITABLE_CO AND can(rfq.create)`
 - app update: `company_id = WRITABLE_CO AND can(rfq.create)`
 - app delete: `company_id = WRITABLE_CO AND can(rfq.create)`
@@ -2543,7 +2543,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 **Indexes:** `ix_rfq_match_reasons_match`
 
 **Access (RLS):**
-- app read: `supplier_company_id = ACTIVE_CO`
+- app read: `supplier_company_id = ACTIVE_CO AND exists (select 1 from public.rfq_supplier_matches m where m.id = match_id)`
 - app insert: **none**
 - app update: **none**
 - app delete: **none**
@@ -2603,7 +2603,7 @@ Reference-data tables (RLS enabled, read-only to application roles): currencies,
 **Indexes:** `ix_rfq_supplier_matches_supplier`; `ix_rfq_supplier_matches_rfq_rank`
 
 **Access (RLS):**
-- app read: `buyer_company_id = ACTIVE_CO OR supplier_company_id = ACTIVE_CO`
+- app read: `buyer_company_id = ACTIVE_CO OR (supplier_company_id = ACTIVE_CO AND exists (select 1 from app.public_rfqs p where p.id = rfq_id))`
 - app insert: **none**
 - app update: `supplier_company_id = WRITABLE_CO`
 - app delete: **none**
