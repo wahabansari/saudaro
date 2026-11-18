@@ -2,7 +2,15 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', 'backend/**', '**/migrations/**'] },
+  { ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      'backend/**',
+      '**/migrations/**',
+      'apps/frontend/web/{reference,src/icons,src/styles,.next}/**',
+      'apps/frontend/web/tailwind.config.ts',
+    ] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

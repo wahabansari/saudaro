@@ -5,3 +5,8 @@ package-lock.json
 backend
 **/migrations
 docs
+apps/frontend/web/reference
+apps/frontend/web/src/styles
+apps/frontend/web/src/icons
+apps/frontend/web/tailwind.config.ts
+apps/frontend/web/.next

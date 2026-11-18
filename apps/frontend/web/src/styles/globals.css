@@ -1,0 +1,15 @@
+/* 1. Design system (tokens + every sa-* component style, verbatim from the design system) */
+@import "./saudaro-tokens.css";
+@import "./saudaro-bundle.css";
+
+/* 2. Tailwind: base only emits its variables (preflight is disabled in tailwind.config.ts) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. Zero-specificity reset so Tailwind utilities and sa-* classes always win */
+:where(h1,h2,h3,h4,h5,h6,p,figure,blockquote,dl,dd,ul,ol){margin:0}
+:where(ul,ol){padding:0;list-style:none}
+:where(button,input,select,textarea){font:inherit;color:inherit}
+:where(img,svg,video){display:block;max-width:100%}
+:where(a){color:inherit}
