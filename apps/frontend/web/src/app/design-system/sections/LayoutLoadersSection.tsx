@@ -109,7 +109,13 @@ export function LayoutLoadersSection() {
                 background: 'var(--grey-100)',
               }}
             >
-              <img src="/brand/saudaro-lockup-horizontal-navy.svg" height={26} width={95} alt="SAUDARO" />
+              <img
+                src="/brand/saudaro-lockup-horizontal-navy.svg"
+                height={26}
+                width={95}
+                style={{ width: 'auto' }}
+                alt="SAUDARO"
+              />
               <span style={{ flex: 1 }} />
               <button type="button" className="sa-btn sa-btn--text sa-btn--sm">
                 Back to list

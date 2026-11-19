@@ -13,6 +13,7 @@ export function Slider({
   value,
   defaultValue,
   min = 0,
+  max = 100,
   onValueChange,
   thumbLabels,
   formatValue,
@@ -32,6 +33,7 @@ export function Slider({
       className={clsx('sa-slider', className)}
       role="group"
       min={min}
+      max={max}
       value={values}
       onValueChange={change}
       {...props}
@@ -40,7 +42,12 @@ export function Slider({
         <RadixSlider.Range className="sa-slider__fill" />
       </RadixSlider.Track>
       {values.map((current, index) => (
-        <RadixSlider.Thumb key={index} className="sa-slider__thumb" aria-label={thumbLabels?.[index]}>
+        <RadixSlider.Thumb
+          key={index}
+          className="sa-slider__thumb"
+          aria-label={thumbLabels?.[index]}
+          style={{ translate: `${((current - min) / (max - min)) * 100 - 50}% 0` }}
+        >
           {formatValue ? (
             <span className="sa-slider__val" style={{ left: '50%', bottom: 20 }}>
               {formatValue(current)}

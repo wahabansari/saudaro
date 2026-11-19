@@ -1,19 +1,47 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Icon } from '@/icons';
 import { FilterPanel } from '@/components/ui/FilterDropdown';
 import { ColumnPickerPanel, type ColumnPickerItem } from '@/components/ui/GridMenus';
-import type { GridFilterOption } from '@/components/ui/DataGrid.types';
 
 const noop = () => undefined;
 
-const PORTS: GridFilterOption[] = [
-  { value: 'Hamburg, Germany', count: 12 },
-  { value: 'Hamilton, Canada', count: 3 },
-  { value: 'Ho Chi Minh, Vietnam', count: 0 },
-];
+function Foot() {
+  return (
+    <div className="sa-fil__foot">
+      <button type="button" className="sa-btn sa-btn--text sa-btn--sm">
+        Clear
+      </button>
+      <button type="button" className="sa-btn sa-btn--sm">
+        Apply
+      </button>
+    </div>
+  );
+}
 
-/** The four filter panels of the FilterDropdown preview, shown open. */
+function PortOption({ checked, count, children }: { checked?: boolean; count: number; children: ReactNode }) {
+  return (
+    <li>
+      <label className="sa-check">
+        <input type="checkbox" defaultChecked={checked} />
+        <span className="sa-check__box">
+          <Icon name="check" />
+        </span>
+        <span>{children}</span>
+        <small>{count}</small>
+      </label>
+    </li>
+  );
+}
+
+const NUMERIC_STYLE = { fontFeatureSettings: "'lnum','cv05'" } as const;
+
+/**
+ * The four filter panels of the FilterDropdown preview, shown open. The port, quantity and
+ * deadline frames are literal preview markup: their sample state (counts, thumb positions,
+ * pressed preset) does not follow from the panel logic.
+ */
 export function FilterPanels() {
   return (
     <div
@@ -29,35 +57,125 @@ export function FilterPanels() {
         />
       </div>
       <div className="sa-fil" role="dialog" aria-label="Filter Destination port">
-        <FilterPanel
-          label="Destination port"
-          type="enum"
-          value={{ type: 'enum', values: ['Hamburg, Germany'] }}
-          options={PORTS}
-          searchLabel="Search ports"
-          defaultQuery="ham"
-          onApply={noop}
-          onClose={noop}
-        />
+        <div className="sa-fil__head">
+          <strong>Destination port</strong>
+          <small>5 of 28</small>
+        </div>
+        <div className="sa-fil__body">
+          <div className="sa-search" style={{ width: '100%' }}>
+            <Icon name="search" />
+            <input type="search" defaultValue="ham" aria-label="Search ports" />
+            <button type="button" className="sa-search__clear" aria-label="Clear search">
+              <Icon name="x" />
+            </button>
+          </div>
+          <ul className="sa-fil__list">
+            <PortOption checked count={12}>
+              <mark style={{ background: 'var(--warning-bg)', color: 'inherit' }}>Ham</mark>burg, Germany
+            </PortOption>
+            <PortOption count={3}>
+              Ham<span></span>ilton, Canada
+            </PortOption>
+            <PortOption count={0}>Ho Chi Minh, Vietnam</PortOption>
+          </ul>
+          <div className="sa-combo__foot" style={{ border: 0, padding: 0 }}>
+            Showing 2 matches
+          </div>
+        </div>
+        <Foot />
       </div>
       <div className="sa-fil" role="dialog" aria-label="Filter Quantity (MT)">
-        <FilterPanel
-          label="Quantity (MT)"
-          type="number"
-          value={{ type: 'number', min: 20, max: 1500 }}
-          bounds={[0, 2500]}
-          onApply={noop}
-          onClose={noop}
-        />
+        <div className="sa-fil__head">
+          <strong>Quantity (MT)</strong>
+          <small>Range</small>
+        </div>
+        <div className="sa-fil__body">
+          <div className="sa-fil__2">
+            <div>
+              <label className="sa-lbl" htmlFor="ds-grid-n1">
+                Min
+              </label>
+              <input
+                className="sa-input"
+                id="ds-grid-n1"
+                defaultValue="20"
+                inputMode="numeric"
+                style={NUMERIC_STYLE}
+              />
+            </div>
+            <div>
+              <label className="sa-lbl" htmlFor="ds-grid-n2">
+                Max
+              </label>
+              <input
+                className="sa-input"
+                id="ds-grid-n2"
+                defaultValue="1,500"
+                inputMode="numeric"
+                style={NUMERIC_STYLE}
+              />
+            </div>
+          </div>
+          <div className="sa-slider" role="group" aria-label="Quantity range">
+            <span className="sa-slider__track"></span>
+            <span className="sa-slider__fill" style={{ left: '8%', right: '40%' }}></span>
+            <span
+              className="sa-slider__thumb"
+              tabIndex={0}
+              role="slider"
+              aria-label="Minimum"
+              aria-valuemin={0}
+              aria-valuemax={1500}
+              aria-valuenow={20}
+              style={{ left: '8%' }}
+            ></span>
+            <span
+              className="sa-slider__thumb"
+              tabIndex={0}
+              role="slider"
+              aria-label="Maximum"
+              aria-valuemin={20}
+              aria-valuemax={2500}
+              aria-valuenow={1500}
+              style={{ left: '60%' }}
+            ></span>
+          </div>
+        </div>
+        <Foot />
       </div>
       <div className="sa-fil" role="dialog" aria-label="Filter Deadline">
-        <FilterPanel
-          label="Deadline"
-          type="date"
-          value={{ type: 'date', from: '2026-12-01', to: '2026-12-31' }}
-          onApply={noop}
-          onClose={noop}
-        />
+        <div className="sa-fil__head">
+          <strong>Deadline</strong>
+          <small>Date range</small>
+        </div>
+        <div className="sa-fil__body">
+          <div className="sa-fil__2">
+            <div>
+              <label className="sa-lbl" htmlFor="ds-grid-d1">
+                From
+              </label>
+              <input className="sa-input" id="ds-grid-d1" defaultValue="01 Dec 2026" />
+            </div>
+            <div>
+              <label className="sa-lbl" htmlFor="ds-grid-d2">
+                To
+              </label>
+              <input className="sa-input" id="ds-grid-d2" defaultValue="31 Dec 2026" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button type="button" className="sa-chip" aria-pressed="false">
+              Today
+            </button>
+            <button type="button" className="sa-chip" aria-pressed="false">
+              Next 7 days
+            </button>
+            <button type="button" className="sa-chip" aria-pressed="true">
+              This month
+            </button>
+          </div>
+        </div>
+        <Foot />
       </div>
     </div>
   );
@@ -107,6 +225,7 @@ export function GridMenusStatic() {
       <div className="sa-fil" role="dialog" aria-label="Columns" style={{ width: 260 }}>
         <ColumnPickerPanel
           columns={COLUMNS}
+          countLabel="10 of 12"
           onToggle={noop}
           onReset={noop}
           done={

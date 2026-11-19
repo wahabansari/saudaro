@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import type { ComponentProps } from 'react';
 import { Icon } from '@/icons';
 
+const BORDER_BETWEEN = '[&:not(:first-child)]:[border-top:1px_solid_var(--card-border)]';
 const KEEP_CLOSED_VISIBLE = 'data-[state=closed]:![animation:none]';
 
 export type AccordionProps = ComponentProps<typeof AccordionPrimitive.Root>;
@@ -16,29 +17,14 @@ export function Accordion({ className, ...props }: AccordionProps) {
 
 export function AccordionItem({ className, ...props }: AccordionItemProps) {
   return (
-    <AccordionPrimitive.Item
-      className={clsx(
-        'border-t border-solid border-card-border first:border-t-0',
-        KEEP_CLOSED_VISIBLE,
-        className,
-      )}
-      {...props}
-    />
+    <AccordionPrimitive.Item className={clsx(BORDER_BETWEEN, KEEP_CLOSED_VISIBLE, className)} {...props} />
   );
 }
 
 export function AccordionTrigger({ className, children, ...props }: AccordionTriggerProps) {
   return (
     <AccordionPrimitive.Header className={KEEP_CLOSED_VISIBLE}>
-      <AccordionPrimitive.Trigger
-        className={clsx(
-          'sa-acc__btn',
-          KEEP_CLOSED_VISIBLE,
-          '[&>svg]:ease-pop [&>svg]:transition-transform [&>svg]:duration-[200ms] [&[data-state=open]>svg]:rotate-180',
-          className,
-        )}
-        {...props}
-      >
+      <AccordionPrimitive.Trigger className={clsx('sa-acc__btn', KEEP_CLOSED_VISIBLE, className)} {...props}>
         {children}
         <Icon name="chevron-down" size={20} />
       </AccordionPrimitive.Trigger>

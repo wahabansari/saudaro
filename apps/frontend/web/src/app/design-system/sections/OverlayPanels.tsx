@@ -1,7 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogActions, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog';
+import {
+  Dialog,
+  DialogActions,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/Dialog';
 import { Popover, PopoverContent } from '@/components/ui/Popover';
 import { Sheet, SheetContent } from '@/components/ui/Sheet';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -124,4 +132,37 @@ function TooltipFrame() {
 
 export function TooltipDemo() {
   return <OverlayDemo name="Tooltip">{() => <TooltipFrame />}</OverlayDemo>;
+}
+
+export function InteractiveDialog() {
+  return (
+    <div data-ds-interactive="Dialog">
+      <Dialog>
+        <DialogTrigger asChild>
+          <button type="button" className="sa-btn sa-btn--danger">
+            Withdraw
+          </button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogTitle>Withdraw quotation QT-2026-0412?</DialogTitle>
+          <DialogDescription>
+            The importer will be notified and can no longer accept it. You can send a new quotation
+            afterwards.
+          </DialogDescription>
+          <DialogActions>
+            <DialogClose asChild>
+              <button type="button" className="sa-btn sa-btn--ghost">
+                Keep quotation
+              </button>
+            </DialogClose>
+            <DialogClose asChild>
+              <button type="button" className="sa-btn sa-btn--danger">
+                Withdraw
+              </button>
+            </DialogClose>
+          </DialogActions>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

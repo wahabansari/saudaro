@@ -44,7 +44,13 @@ export function ColumnMenu({
         onPointerDown={(event) => event.preventDefault()}
         onContextMenu={openFromContextMenu}
       >
-        <span className={clsx('sa-th__label', 'data-[state=closed]:![animation:none]', className)}>
+        <span
+          className={clsx('sa-th__label', 'data-[state=closed]:![animation:none]', className)}
+          // The label is a plain span: a menu trigger's ARIA attributes are not allowed on it.
+          aria-haspopup={undefined}
+          aria-expanded={undefined}
+          aria-controls={undefined}
+        >
           {label}
         </span>
       </DropdownMenu.Trigger>
@@ -91,7 +97,8 @@ export function ColumnPickerPanel({
   onToggle,
   onReset,
   done,
-}: ColumnPickerProps & { done: ReactNode }) {
+  countLabel,
+}: ColumnPickerProps & { done: ReactNode; countLabel?: string }) {
   const [query, setQuery] = useState('');
   const shown = columns.filter((column) => column.label.toLowerCase().includes(query.trim().toLowerCase()));
   const visibleCount = columns.filter((column) => column.isVisible).length;
@@ -100,9 +107,7 @@ export function ColumnPickerPanel({
     <>
       <div className="sa-fil__head">
         <strong>Columns</strong>
-        <small>
-          {visibleCount} of {columns.length}
-        </small>
+        <small>{countLabel ?? `${visibleCount} of ${columns.length}`}</small>
       </div>
       <div className="sa-fil__body">
         <div className="sa-search" style={{ width: '100%' }}>

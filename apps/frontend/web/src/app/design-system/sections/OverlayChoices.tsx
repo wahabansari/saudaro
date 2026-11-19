@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { DatePicker } from '@/components/ui/DatePicker';
+import { DatePickerCalendar } from '@/components/ui/DatePickerCalendar';
 import {
   Menu,
   MenuCheckboxItem,
@@ -18,35 +18,41 @@ import {
 import { Icon } from '@/icons';
 import { labelStyle, noop, OverlayDemo, STATIC_POPPER } from './OverlayDemo';
 
-const VALID_RANGE = { start: new Date(2026, 11, 8), end: new Date(2026, 11, 15) };
-const EARLIEST = new Date(2026, 11, 2);
-
-function DatePickerFrame() {
-  const [frame, setFrame] = useState<HTMLDivElement | null>(null);
-  return (
-    <div
-      ref={setFrame}
-      className={STATIC_POPPER}
-      style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}
-    >
-      <div style={{ width: 240 }}>
-        <label style={labelStyle}>Quotation valid until</label>
-        <DatePicker
-          mode="range"
-          aria-label="Valid until"
-          value={VALID_RANGE}
-          onValueChange={noop}
-          minDate={EARLIEST}
-          open={frame !== null}
-          container={frame ?? undefined}
-        />
-      </div>
-    </div>
-  );
-}
+const PREVIEW_TODAY = new Date(2026, 11, 2);
+const PREVIEW_RANGE = { start: new Date(2026, 11, 8), end: new Date(2026, 11, 15) };
 
 export function DatePickerDemo() {
-  return <OverlayDemo name="DatePicker">{() => <DatePickerFrame />}</OverlayDemo>;
+  return (
+    <OverlayDemo name="DatePicker">
+      {() => (
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ width: 240 }}>
+            <label style={labelStyle}>Quotation valid until</label>
+            <div className="sa-inputwrap">
+              <Icon name="calendar" size={20} />
+              <input
+                className="sa-input sa-input--icon"
+                defaultValue="15 Dec 2026"
+                aria-label="Valid until"
+              />
+            </div>
+          </div>
+          <div className="sa-cal" role="dialog" aria-label="Choose dates">
+            <DatePickerCalendar
+              initial={PREVIEW_RANGE.end}
+              today={PREVIEW_TODAY}
+              minDate={PREVIEW_TODAY}
+              draft={PREVIEW_RANGE}
+              canApply
+              onPick={noop}
+              onApply={noop}
+              onCancel={noop}
+            />
+          </div>
+        </div>
+      )}
+    </OverlayDemo>
+  );
 }
 
 function StaticMenu({ children }: { children: ReactNode }) {

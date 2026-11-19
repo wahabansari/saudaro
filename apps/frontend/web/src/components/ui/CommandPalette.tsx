@@ -22,18 +22,22 @@ export type CommandPaletteProps = {
   placeholder: string;
   emptyLabel?: string;
   container?: HTMLElement;
+  defaultValue?: string;
 };
 
 const ITEM =
   'sa-menu__item data-[selected=true]:bg-grey-100 [animation:sa-item-in_340ms_var(--ease-pop)_both]';
 
-type BodyProps = Pick<CommandPaletteProps, 'groups' | 'placeholder' | 'emptyLabel' | 'onOpenChange'>;
+type BodyProps = Pick<
+  CommandPaletteProps,
+  'groups' | 'placeholder' | 'emptyLabel' | 'onOpenChange' | 'defaultValue'
+>;
 
-function PaletteBody({ groups, placeholder, emptyLabel, onOpenChange }: BodyProps) {
+function PaletteBody({ groups, placeholder, emptyLabel, onOpenChange, defaultValue }: BodyProps) {
   const [search, setSearch] = useState('');
 
   return (
-    <Command label="Command palette">
+    <Command label="Command palette" defaultValue={defaultValue}>
       <div className="sa-cmd__in">
         <Icon name="search" size={20} />
         <Command.Input
@@ -100,6 +104,7 @@ export function CommandPalette({
   placeholder,
   emptyLabel = 'No results for',
   container,
+  defaultValue,
 }: CommandPaletteProps) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -120,6 +125,7 @@ export function CommandPalette({
     >
       <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
       <PaletteBody
+        defaultValue={defaultValue}
         groups={groups}
         placeholder={placeholder}
         emptyLabel={emptyLabel}

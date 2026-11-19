@@ -170,10 +170,10 @@ export function DisplaySection() {
         <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
           <div>
             <div style={progressHead}>
-              <span>certificate-iso22000.pdf</span>
+              <span id="ds-progress-file">certificate-iso22000.pdf</span>
               <span className="sa-mono">64%</span>
             </div>
-            <Progress value={64} />
+            <Progress value={64} aria-labelledby="ds-progress-file" />
           </div>
           <div>
             <div style={{ font: '500 14px/20px var(--font-sans)', marginBottom: 6 }}>Processing…</div>

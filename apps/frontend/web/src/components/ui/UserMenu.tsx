@@ -58,7 +58,7 @@ export function UserMenu({
       <DropdownMenuPrimitive.Trigger asChild>
         <button
           type="button"
-          aria-label="Account menu"
+          aria-label={`${initials} Account menu`}
           {...props}
           className={clsx('sa-iconbtn rounded-full data-[state=closed]:![animation:none]', className)}
         >

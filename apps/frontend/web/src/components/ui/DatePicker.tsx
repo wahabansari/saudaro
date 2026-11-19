@@ -23,27 +23,19 @@ type Modes =
   | { mode: 'range'; value: DateRange; onValueChange: (value: DateRange) => void };
 
 export type DatePickerProps = Omit<ComponentProps<'input'>, 'value' | 'defaultValue' | 'onChange' | 'type'> &
-  Modes & { minDate?: Date; maxDate?: Date; open?: boolean; container?: HTMLElement };
+  Modes & { minDate?: Date; maxDate?: Date };
 
 function nextDraft(draft: DateRange, date: Date, isRange: boolean): DateRange {
   if (!isRange || !draft.start || draft.end) return { start: date, end: null };
   return compareDays(date, draft.start) < 0 ? { start: date, end: draft.start } : { ...draft, end: date };
 }
 
-export function DatePicker({
-  minDate,
-  maxDate,
-  open: openProp,
-  container,
-  className,
-  ...props
-}: DatePickerProps) {
+export function DatePicker({ minDate, maxDate, className, ...props }: DatePickerProps) {
   const { mode, value, onValueChange, ...inputProps } = props;
   const isRange = mode === 'range';
   const current: DateRange = isRange ? value : { start: value, end: null };
   const formatted = isRange ? formatRange(current) : current.start ? formatDate(current.start) : '';
-  const [openState, setOpen] = useState(false);
-  const open = openProp ?? openState;
+  const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange>(current);
   const [typed, setTyped] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -88,7 +80,6 @@ export function DatePicker({
           <input
             autoComplete="off"
             aria-haspopup="dialog"
-            aria-expanded={open}
             {...inputProps}
             className="sa-input sa-input--icon"
             value={typed ?? formatted}
@@ -99,7 +90,7 @@ export function DatePicker({
           />
         </div>
       </PopoverPrimitive.Anchor>
-      <PopoverPrimitive.Portal container={container}>
+      <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
           ref={contentRef}
           className="sa-cal z-dropdown [--pop-origin:var(--radix-popover-content-transform-origin)]"
@@ -108,7 +99,6 @@ export function DatePicker({
           aria-label="Choose dates"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
-            if (container) return;
             contentRef.current?.querySelector<HTMLElement>('.sa-day[tabindex="0"]')?.focus();
           }}
           onCloseAutoFocus={(event) => {

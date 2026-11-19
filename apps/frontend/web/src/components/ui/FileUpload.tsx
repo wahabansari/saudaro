@@ -86,6 +86,7 @@ export function FileUpload({
         type="file"
         className="sa-sr"
         tabIndex={-1}
+        aria-label="Drag files here or browse"
         accept={accept}
         multiple={multiple}
         onChange={handleChange}

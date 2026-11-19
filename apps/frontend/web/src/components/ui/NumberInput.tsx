@@ -1,12 +1,13 @@
 'use client';
 
-import clsx from 'clsx';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { ChangeEvent, ComponentPropsWithRef, MouseEvent, ReactNode } from 'react';
+import type { CSSProperties, ChangeEvent, ComponentPropsWithRef, MouseEvent, ReactNode } from 'react';
 import { Icon } from '@/icons';
 
 const HOLD_DELAY_MS = 500;
 const REPEAT_INTERVAL_MS = 80;
+
+const dimmed: CSSProperties = { color: 'var(--grey-400)' };
 
 export type NumberInputProps = Omit<
   ComponentPropsWithRef<'input'>,
@@ -92,8 +93,6 @@ export function NumberInput({
     commit(clamp(Number.isFinite(number) && text.trim() !== '' ? number : Number.isFinite(min) ? min : 0));
   }
 
-  const dimmed = 'text-grey-400';
-
   return (
     <div className="sa-field">
       {label ? (
@@ -106,7 +105,7 @@ export function NumberInput({
           type="button"
           aria-label="Decrease"
           disabled={disabled || number <= min}
-          className={clsx((disabled || number <= min) && dimmed)}
+          style={disabled || number <= min ? dimmed : undefined}
           onPointerDown={() => start(-1)}
           onPointerUp={stop}
           onPointerLeave={stop}
@@ -129,7 +128,7 @@ export function NumberInput({
           type="button"
           aria-label="Increase"
           disabled={disabled || number >= max}
-          className={clsx((disabled || number >= max) && dimmed)}
+          style={disabled || number >= max ? dimmed : undefined}
           onPointerDown={() => start(1)}
           onPointerUp={stop}
           onPointerLeave={stop}

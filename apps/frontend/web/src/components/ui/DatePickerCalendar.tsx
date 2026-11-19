@@ -18,6 +18,7 @@ type Props = {
   initial: Date;
   draft: DateRange;
   canApply: boolean;
+  today?: Date;
   minDate?: Date;
   maxDate?: Date;
   onPick: (date: Date) => void;
@@ -25,6 +26,7 @@ type Props = {
   onCancel: () => void;
 };
 
+const WEEK_LENGTH = 7;
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const KEY_STEPS: Record<string, (date: Date) => Date> = {
   ArrowLeft: (date) => addDays(date, -1),
@@ -41,6 +43,7 @@ export function DatePickerCalendar({
   initial,
   draft,
   canApply,
+  today: todayProp,
   minDate,
   maxDate,
   onPick,
@@ -50,7 +53,7 @@ export function DatePickerCalendar({
   const [cursor, setCursor] = useState(initial);
   const gridRef = useRef<HTMLDivElement>(null);
   const shouldFocus = useRef(false);
-  const today = new Date();
+  const today = todayProp ?? new Date();
   const { start, end } = draft;
 
   useEffect(() => {
@@ -69,6 +72,17 @@ export function DatePickerCalendar({
     if (!step) return;
     event.preventDefault();
     moveCursor(step(cursor));
+  }
+
+  const cells = monthCells(cursor);
+  const weeks = Array.from({ length: Math.ceil(cells.length / WEEK_LENGTH) }, (_, index) =>
+    cells.slice(index * WEEK_LENGTH, (index + 1) * WEEK_LENGTH),
+  );
+
+  function isSelected(date: Date) {
+    if (start === null) return false;
+    if (isSameDay(date, start) || (end !== null && isSameDay(date, end))) return true;
+    return end !== null && compareDays(date, start) > 0 && compareDays(date, end) < 0;
   }
 
   function dayClass(date: Date, outside: boolean) {
@@ -109,30 +123,44 @@ export function DatePickerCalendar({
         </button>
       </div>
       <div ref={gridRef} className="sa-cal__grid" role="grid" onKeyDown={handleKeyDown}>
-        {WEEKDAYS.map((weekday) => (
-          <span key={weekday} className="sa-cal__dow">
-            {weekday}
-          </span>
-        ))}
-        {monthCells(cursor).map(({ date, outside }) => (
-          <button
-            key={date.getTime()}
-            type="button"
-            className={dayClass(date, outside)}
-            tabIndex={isSameDay(date, cursor) ? 0 : -1}
-            disabled={isOutOfBounds(date, minDate, maxDate)}
-            aria-label={DAY_LABEL.format(date)}
-            aria-current={isSameDay(date, today) ? 'date' : undefined}
-            aria-pressed={
-              (start !== null && isSameDay(date, start)) || (end !== null && isSameDay(date, end))
-            }
-            onClick={() => {
-              onPick(date);
-              setCursor(date);
-            }}
-          >
-            {date.getDate()}
-          </button>
+        <div role="row" className="contents">
+          {WEEKDAYS.map((weekday) => (
+            <span key={weekday} role="columnheader" className="sa-cal__dow">
+              {weekday}
+            </span>
+          ))}
+        </div>
+        {weeks.map((week) => (
+          <div key={week[0]?.date.getTime()} role="row" className="contents">
+            {week.map(({ date, outside }) => {
+              const blocked = isOutOfBounds(date, minDate, maxDate);
+              return (
+                <div
+                  key={date.getTime()}
+                  role="gridcell"
+                  className="contents"
+                  aria-selected={isSelected(date)}
+                >
+                  <button
+                    type="button"
+                    className={dayClass(date, outside)}
+                    tabIndex={isSameDay(date, cursor) ? 0 : -1}
+                    disabled={blocked && !outside}
+                    aria-disabled={blocked && outside ? true : undefined}
+                    aria-label={DAY_LABEL.format(date)}
+                    aria-current={isSameDay(date, today) ? 'date' : undefined}
+                    onClick={() => {
+                      if (blocked) return;
+                      onPick(date);
+                      setCursor(date);
+                    }}
+                  >
+                    {date.getDate()}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         ))}
       </div>
       <div className="sa-cal__foot">

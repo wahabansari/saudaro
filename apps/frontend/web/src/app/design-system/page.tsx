@@ -43,7 +43,7 @@ export default function DesignSystemPage() {
           ))}
         </nav>
         {groups.map(({ id, title, Section }) => (
-          <section key={id} id={id} aria-labelledby={`${id}-h`} className="mb-16 grid gap-8">
+          <section key={id} id={id} aria-labelledby={`${id}-h`} className="mb-16 grid gap-8 [&>*]:min-w-0">
             <h2 id={`${id}-h`} className="text-h2">
               {title}
             </h2>

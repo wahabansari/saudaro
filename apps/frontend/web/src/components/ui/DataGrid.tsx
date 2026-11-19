@@ -61,8 +61,9 @@ export type DataGridProps<TData extends RowData> = Omit<HTMLAttributes<HTMLDivEl
   defaultDensity?: GridDensity;
   /** Selected row ids on first render. */
   defaultRowSelection?: RowSelectionState;
-  /** Column id whose filter popover is open on first render. */
-  defaultOpenFilterId?: string;
+  /** Column id whose filter popover is open; set it (with `onOpenFilterChange`) to control the popover. */
+  openFilterId?: string | null;
+  onOpenFilterChange?: (columnId: string | null) => void;
   /** Portal target of the filter popovers, for rendering them inside a wrapper. */
   portalContainer?: HTMLElement | null;
 };
@@ -105,7 +106,8 @@ export function DataGrid<TData extends RowData>({
   maxHeight,
   defaultDensity = 'comfortable',
   defaultRowSelection = {},
-  defaultOpenFilterId,
+  openFilterId,
+  onOpenFilterChange,
   portalContainer,
   className,
   style,
@@ -117,7 +119,9 @@ export function DataGrid<TData extends RowData>({
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>(() => initialPinning(columns));
   const [density, setDensity] = useState(defaultDensity);
   const [menuColumnId, setMenuColumnId] = useState<string | null>(null);
-  const [filterColumnId, setFilterColumnId] = useState<string | null>(defaultOpenFilterId ?? null);
+  const [innerFilterId, setInnerFilterId] = useState<string | null>(null);
+  const filterColumnId = openFilterId === undefined ? innerFilterId : openFilterId;
+  const setFilterColumnId = onOpenFilterChange ?? setInnerFilterId;
 
   const tableColumns = useMemo(
     () =>
@@ -188,15 +192,15 @@ export function DataGrid<TData extends RowData>({
     ...(search
       ? [{ id: 'search', label: 'Search', text: `Search: ${search}`, onRemove: () => changeSearch('') }]
       : []),
-    ...allColumns.flatMap((column) => {
-      const filter = filters[column.id];
-      return filter
+    ...Object.entries(filters).flatMap(([id, filter]) => {
+      const column = table.getColumn(id);
+      return column
         ? [
             {
-              id: column.id,
+              id,
               label: columnLabel(column),
               text: describeFilter(columnLabel(column), filter),
-              onRemove: () => setFilter(column.id, undefined),
+              onRemove: () => setFilter(id, undefined),
             },
           ]
         : [];
@@ -266,9 +270,6 @@ export function DataGrid<TData extends RowData>({
                     <input
                       type="checkbox"
                       checked={table.getIsAllPageRowsSelected()}
-                      ref={(input) => {
-                        if (input) input.indeterminate = table.getIsSomePageRowsSelected();
-                      }}
                       onChange={(event) => table.toggleAllPageRowsSelected(event.target.checked)}
                     />
                     <span className="sa-check__box">

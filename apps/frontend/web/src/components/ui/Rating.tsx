@@ -11,7 +11,7 @@ const STAR_COUNT = 5;
 
 export function Rating({ value, reviews, className, ...props }: RatingProps) {
   const score = value.toFixed(1);
-  const filled = Math.round(value);
+  const filled = Math.floor(value);
   return (
     <div className={clsx('flex items-center gap-2', className)} {...props}>
       <span className="sa-rate" role="img" aria-label={`${score} out of ${STAR_COUNT}`}>

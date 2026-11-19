@@ -36,12 +36,15 @@ export function ToastProvider({ duration = TOAST_DURATION_MS, ...props }: ToastP
 export function ToastViewport({ className, ...props }: ToastViewportProps) {
   return (
     <RadixToast.Viewport
+      asChild
       className={clsx(
-        'fixed inset-x-4 top-4 z-toast m-0 flex list-none flex-col items-center gap-3 p-0 md:inset-x-auto md:bottom-4 md:right-4 md:top-auto md:items-end',
+        'fixed inset-x-4 top-4 z-toast flex flex-col items-center gap-3 md:inset-x-auto md:bottom-4 md:right-4 md:top-auto md:items-end',
         className,
       )}
       {...props}
-    />
+    >
+      <div />
+    </RadixToast.Viewport>
   );
 }
 
@@ -49,17 +52,19 @@ export function Toast({ tone = 'success', title, children, className, ...props }
   const isError = tone === 'danger';
   return (
     <RadixToast.Root
-      className={clsx('sa-toast', className)}
+      asChild
       type={isError ? 'foreground' : 'background'}
       role={isError ? 'alert' : 'status'}
       {...props}
     >
-      <span className="sa-toast__icon" style={toneStyle(tone)}>
-        <Icon name={TONE_ICON[tone]} size={20} />
-      </span>
-      <div>
-        <strong>{title}</strong>
-        {children}
+      <div className={clsx('sa-toast', className)}>
+        <span className="sa-toast__icon" style={toneStyle(tone)}>
+          <Icon name={TONE_ICON[tone]} size={20} />
+        </span>
+        <div>
+          <strong>{title}</strong>
+          {children}
+        </div>
       </div>
     </RadixToast.Root>
   );

@@ -1,11 +1,11 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Combobox } from '@/components/ui/Combobox';
 import { CommandPalette, type CommandPaletteGroup } from '@/components/ui/CommandPalette';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { UserMenu } from '@/components/ui/UserMenu';
-import { labelStyle, noop, OverlayDemo } from './OverlayDemo';
+import { ANCHORED, ANCHORED_END, comboOf, labelStyle, noop, OverlayDemo } from './OverlayDemo';
 
 const COUNTRIES = [
   { value: 'de', label: 'Germany', flag: 'DE' },
@@ -69,8 +69,9 @@ export function ComboboxDemo() {
         <div style={{ display: 'grid', gap: 20, maxWidth: 360 }}>
           <Field label="Destination country">
             <Combobox
+              className={ANCHORED}
               open={frame !== null}
-              container={frame ?? undefined}
+              container={comboOf(frame)}
               options={COUNTRIES}
               value="nl"
               onValueChange={noop}
@@ -92,6 +93,7 @@ export function CommandPaletteDemo() {
         <CommandPalette
           open={frame !== null}
           container={frame ?? undefined}
+          defaultValue="RFQs"
           onOpenChange={noop}
           groups={COMMANDS}
           placeholder="Search or jump to…"
@@ -108,8 +110,10 @@ export function MultiSelectDemo() {
         <div style={{ maxWidth: 380 }}>
           <label style={labelStyle}>Certifications</label>
           <MultiSelect
+            aria-label="Certifications"
+            className={ANCHORED}
             open={frame !== null}
-            container={frame ?? undefined}
+            container={comboOf(frame)}
             options={CERTIFICATIONS}
             values={['halal', 'haccp']}
             onValuesChange={noop}
@@ -123,23 +127,28 @@ export function MultiSelectDemo() {
   );
 }
 
-export function UserMenuDemo() {
+function UserMenuFrame() {
+  const [row, setRow] = useState<HTMLDivElement | null>(null);
   return (
-    <OverlayDemo name="UserMenu">
-      {(frame) => (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', maxWidth: 360 }}>
-            <UserMenu
-              open={frame !== null}
-              container={frame ?? undefined}
-              name="Muhammad Wahab"
-              email="wahab@exporter.example"
-              initials="MW"
-            />
-          </div>
-          <div style={{ height: 300 }} />
-        </>
-      )}
-    </OverlayDemo>
+    <>
+      <div
+        ref={setRow}
+        className={ANCHORED_END}
+        style={{ display: 'flex', justifyContent: 'flex-end', maxWidth: 360 }}
+      >
+        <UserMenu
+          open={row !== null}
+          container={row ?? undefined}
+          name="Muhammad Wahab"
+          email="wahab@exporter.example"
+          initials="MW"
+        />
+      </div>
+      <div style={{ height: 300 }} />
+    </>
   );
+}
+
+export function UserMenuDemo() {
+  return <OverlayDemo name="UserMenu">{() => <UserMenuFrame />}</OverlayDemo>;
 }

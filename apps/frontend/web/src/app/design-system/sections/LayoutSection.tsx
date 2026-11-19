@@ -16,6 +16,9 @@ import { LayoutLoadersSection } from './LayoutLoadersSection';
 
 const noop = () => undefined;
 
+// The previews show tab lists without panels, so the triggers must not reference one.
+const NO_PANEL = { 'aria-controls': undefined };
+
 const SIDEBAR_GROUPS: SidebarGroup[] = [
   {
     label: 'Trade',
@@ -106,12 +109,18 @@ export function LayoutSection() {
         >
           <Tabs defaultValue="overview">
             <TabsList style={{ marginTop: 4 }}>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="documents">
+              <TabsTrigger {...NO_PANEL} value="overview">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger {...NO_PANEL} value="documents">
                 Documents <span className="sa-badge sa-badge--info">6</span>
               </TabsTrigger>
-              <TabsTrigger value="quotations">Quotations</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger {...NO_PANEL} value="quotations">
+                Quotations
+              </TabsTrigger>
+              <TabsTrigger {...NO_PANEL} value="activity">
+                Activity
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </PageHeader>
@@ -209,11 +218,15 @@ export function LayoutSection() {
         <div>
           <Tabs defaultValue="overview">
             <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="documents">
+              <TabsTrigger {...NO_PANEL} value="overview">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger {...NO_PANEL} value="documents">
                 Documents <span className="sa-badge sa-badge--pill">8</span>
               </TabsTrigger>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
+              <TabsTrigger {...NO_PANEL} value="reviews">
+                Reviews
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>

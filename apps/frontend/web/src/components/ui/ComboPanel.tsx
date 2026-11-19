@@ -37,7 +37,8 @@ export function ComboPanel({
   children,
 }: Props) {
   const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
+  const noActive = multiple ? -1 : 0;
+  const [active, setActive] = useState(noActive);
   const listRef = useRef<HTMLUListElement>(null);
   const needle = query.trim().toLowerCase();
   const visible = options.filter((option) => option.label.toLowerCase().includes(needle));
@@ -56,7 +57,9 @@ export function ComboPanel({
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
     const step = event.key === 'ArrowDown' ? 1 : -1;
-    setActive((index) => (index + step + visible.length) % visible.length);
+    setActive((index) =>
+      index < 0 ? (step > 0 ? 0 : visible.length - 1) : (index + step + visible.length) % visible.length,
+    );
   }
 
   return (
@@ -73,7 +76,7 @@ export function ComboPanel({
             role="combobox"
             aria-expanded
             aria-controls={listId}
-            aria-activedescendant={visible.length ? `${listId}-${active}` : undefined}
+            aria-activedescendant={active >= 0 && visible.length ? `${listId}-${active}` : undefined}
             aria-autocomplete="list"
             autoComplete="off"
             placeholder={placeholder}
@@ -81,7 +84,7 @@ export function ComboPanel({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              setActive(0);
+              setActive(noActive);
             }}
             onKeyDown={handleKeyDown}
           />
@@ -107,7 +110,7 @@ export function ComboPanel({
                 onClick={() => onPick(option.value)}
               >
                 {multiple ? (
-                  <span className="sa-check pointer-events-none">
+                  <span className="sa-check pointer-events-none" aria-hidden="true">
                     <input type="checkbox" checked={isSelected} readOnly tabIndex={-1} />
                     <span className="sa-check__box">
                       <Icon name="check" size={20} />

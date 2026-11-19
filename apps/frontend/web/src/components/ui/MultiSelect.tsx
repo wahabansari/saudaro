@@ -53,7 +53,7 @@ export function MultiSelect({
       <div className={clsx('sa-combo', className)} data-open={open ? '' : undefined}>
         <PopoverPrimitive.Trigger asChild>
           <div
-            role="button"
+            role="combobox"
             tabIndex={0}
             aria-haspopup="listbox"
             {...props}

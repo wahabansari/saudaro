@@ -63,7 +63,8 @@ function GridDemo({
       searchPlaceholder="Search ref, product, buyer"
       rowActions={rowActions}
       defaultRowSelection={isBulk ? SELECTED : undefined}
-      defaultOpenFilterId={openFilterId}
+      openFilterId={openFilterId}
+      onOpenFilterChange={openFilterId ? () => undefined : undefined}
       portalContainer={portalContainer}
       noResults={{
         title: 'No RFQs match these filters',

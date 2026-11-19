@@ -138,7 +138,7 @@ export function NegotiationThread({
         <textarea id={composerId} className="sa-textarea" rows={1} placeholder="Write a message" />
         <div className="sa-mp__row">
           <button type="button" className="sa-iconbtn" aria-label="Attach a document" onClick={onAttach}>
-            <Icon name="download" size={20} />
+            <Icon name="upload" size={20} />
           </button>
           <button type="submit" className="sa-btn">
             <Icon name="send" size={20} />

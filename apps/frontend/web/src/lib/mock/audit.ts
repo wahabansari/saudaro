@@ -1,0 +1,138 @@
+export type AuditEvent = {
+  id: string;
+  date: string;
+  time: string;
+  actor: string;
+  action: string;
+  object: string;
+  detail: string;
+};
+
+export const AUDIT_EVENTS: AuditEvent[] = [
+  {
+    id: 'AUD-004127',
+    date: '2026-11-18',
+    time: '09:12',
+    actor: 'Muhammad Wahab',
+    action: 'Sent quotation',
+    object: 'QT-2026-0412',
+    detail: 'Revision 2 submitted',
+  },
+  {
+    id: 'AUD-004126',
+    date: '2026-11-17',
+    time: '16:40',
+    actor: 'Ayesha Rahman',
+    action: 'Uploaded document',
+    object: 'DOC-0217',
+    detail: 'Lab-report-coa-batch-77.pdf',
+  },
+  {
+    id: 'AUD-004125',
+    date: '2026-11-17',
+    time: '14:05',
+    actor: 'Bilal Chaudhry',
+    action: 'Sent quotation',
+    object: 'QT-2026-0409',
+    detail: 'Revision 1 submitted',
+  },
+  {
+    id: 'AUD-004124',
+    date: '2026-11-16',
+    time: '11:22',
+    actor: 'Muhammad Wahab',
+    action: 'Published product',
+    object: 'PRD-0118',
+    detail: 'Basmati Rice 1121 Steam',
+  },
+  {
+    id: 'AUD-004123',
+    date: '2026-11-15',
+    time: '17:48',
+    actor: 'Sana Iqbal',
+    action: 'Downloaded document',
+    object: 'DOC-0231',
+    detail: 'ISO-22000-certificate-2026.pdf',
+  },
+  {
+    id: 'AUD-004122',
+    date: '2026-11-14',
+    time: '10:31',
+    actor: 'Muhammad Wahab',
+    action: 'Sent message',
+    object: 'QT-2026-0412',
+    detail: 'Revised offer attached',
+  },
+  {
+    id: 'AUD-004121',
+    date: '2026-11-13',
+    time: '15:09',
+    actor: 'Ayesha Rahman',
+    action: 'Changed role',
+    object: 'USR-0003',
+    detail: 'Viewer to Member',
+  },
+  {
+    id: 'AUD-004120',
+    date: '2026-11-12',
+    time: '09:55',
+    actor: 'Muhammad Wahab',
+    action: 'Invited member',
+    object: 'USR-0005',
+    detail: 'omar.farooq@alnoorfoods.example',
+  },
+  {
+    id: 'AUD-004119',
+    date: '2026-11-11',
+    time: '13:17',
+    actor: 'Bilal Chaudhry',
+    action: 'Withdrew quotation',
+    object: 'QT-2026-0380',
+    detail: 'Importer was notified',
+  },
+  {
+    id: 'AUD-004118',
+    date: '2026-11-10',
+    time: '08:44',
+    actor: 'Muhammad Wahab',
+    action: 'Paused product',
+    object: 'PRD-0112',
+    detail: 'Turmeric finger, polished',
+  },
+  {
+    id: 'AUD-004117',
+    date: '2026-11-09',
+    time: '12:03',
+    actor: 'Ayesha Rahman',
+    action: 'Accepted quotation',
+    object: 'QT-2026-0398',
+    detail: 'Deal DL-2026-0087 created',
+  },
+  {
+    id: 'AUD-004116',
+    date: '2026-11-05',
+    time: '16:26',
+    actor: 'Muhammad Wahab',
+    action: 'Submitted verification',
+    object: 'Bank account',
+    detail: 'Pending review',
+  },
+  {
+    id: 'AUD-004115',
+    date: '2026-10-30',
+    time: '10:14',
+    actor: 'Ayesha Rahman',
+    action: 'Uploaded document',
+    object: 'DOC-0217',
+    detail: 'Lab-report-coa-batch-77.pdf',
+  },
+  {
+    id: 'AUD-004114',
+    date: '2026-10-02',
+    time: '14:38',
+    actor: 'Muhammad Wahab',
+    action: 'Suspended member',
+    object: 'USR-0006',
+    detail: 'Hina Siddiqui',
+  },
+];

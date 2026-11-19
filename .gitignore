@@ -9,3 +9,4 @@ coverage/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+apps/frontend/web/tests/visual/.output
