@@ -1,79 +1,59 @@
-'use client';
-
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import { cloneElement, isValidElement } from 'react';
-import type { ComponentPropsWithRef, MouseEvent, ReactElement } from 'react';
 
-export type ButtonVariant =
-  | 'primary'
-  | 'secondary'
-  | 'outline'
-  | 'dashed'
-  | 'text'
-  | 'link'
-  | 'danger'
-  | 'danger-soft'
-  | 'inverse'
-  | 'inverse-outline'
-  | 'inverse-ghost';
-
-export type ButtonProps = ComponentPropsWithRef<'button'> & {
-  variant?: ButtonVariant;
+type Props = ComponentProps<'button'> & {
+  variant?:
+    | 'primary'
+    | 'secondary'
+    | 'outline'
+    | 'dashed'
+    | 'text'
+    | 'link'
+    | 'danger'
+    | 'danger-soft'
+    | 'ghost'
+    | 'inverse'
+    | 'inverse-outline'
+    | 'inverse-ghost';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
-  loadingLabel?: string;
-  asChild?: boolean;
+  href?: string;
 };
 
-function blockClick(event: MouseEvent) {
-  event.preventDefault();
-}
+export type ButtonProps = Props;
 
 export function Button({
   variant = 'primary',
   size = 'md',
-  loading = false,
-  loadingLabel,
-  asChild = false,
-  type = 'button',
+  loading,
+  href,
   className,
   children,
   ...props
-}: ButtonProps) {
-  const classes = clsx(
-    'sa-btn',
-    variant !== 'primary' && `sa-btn--${variant}`,
-    size !== 'md' && `sa-btn--${size}`,
-    className,
-  );
-
-  if (asChild && isValidElement<{ className?: string }>(children)) {
-    return cloneElement(children as ReactElement<{ className?: string }>, {
-      ...props,
-      className: clsx(classes, children.props.className),
-    });
-  }
-
+}: Props) {
+  const Tag = href ? 'a' : 'button';
+  const label = typeof children === 'string' ? children : 'Loading';
   return (
-    <button
-      type={type}
-      className={classes}
+    <Tag
+      {...(props as object)}
+      href={href}
+      type={href ? undefined : (props.type ?? 'button')}
       aria-busy={loading || undefined}
-      {...props}
-      onClick={loading ? blockClick : props.onClick}
+      className={clsx(
+        'sa-btn max-w-full',
+        variant !== 'primary' && `sa-btn--${variant}`,
+        size !== 'md' && `sa-btn--${size}`,
+        className,
+      )}
     >
       {loading ? (
         <>
           <span className="sa-btn__label">{children}</span>
-          <span
-            className="sa-spinner"
-            role="status"
-            aria-label={loadingLabel ?? (typeof children === 'string' ? children : undefined)}
-          />
+          <span className="sa-spinner" role="status" aria-label={label} />
         </>
       ) : (
         children
       )}
-    </button>
+    </Tag>
   );
 }

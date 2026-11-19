@@ -8,16 +8,22 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const overflowers = (page: Page) =>
   page.evaluate(() => {
     const limit = document.documentElement.clientWidth;
+    const clipped = (e: Element) => {
+      for (let p = e.parentElement; p && p !== document.body; p = p.parentElement)
+        if (getComputedStyle(p).overflowX !== 'visible') return true;
+      return false;
+    };
     return [...document.body.querySelectorAll('*')]
-      .filter((e) => e.getBoundingClientRect().right > limit + 1)
+      .filter((e) => e.getBoundingClientRect().right > limit + 1 && !clipped(e))
+      .sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)
       .slice(0, 5)
-      .map((e) => `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 40)} in ${e.closest('[data-ds-component]')?.getAttribute('data-ds-component') ?? 'page'}`);
+      .map((e) => `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 40)} in ${e.closest('[data-ds-component]')?.getAttribute('data-ds-component') ?? 'page'} (right ${Math.round(e.getBoundingClientRect().right)})`);
   });
 
 for (const width of [1440, 375]) {
   test(`axe at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/design-system', { waitUntil: 'networkidle' });
+    await page.goto('/', { waitUntil: 'networkidle' });
     const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
     const rows = [];
     for (const v of violations) {
@@ -39,7 +45,7 @@ for (const [label, viewport, scale] of [['320px', 320, 1], ['200% zoom', 720, 2]
   test(`no horizontal page scroll at ${label}`, async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: viewport, height: 800 }, deviceScaleFactor: scale });
     const page = await ctx.newPage();
-    await page.goto('/design-system', { waitUntil: 'networkidle' });
+    await page.goto('/', { waitUntil: 'networkidle' });
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
@@ -52,7 +58,7 @@ for (const [label, viewport, scale] of [['320px', 320, 1], ['200% zoom', 720, 2]
 }
 
 test('data-theme="navy" re-themes a gallery section', async ({ page }) => {
-  await page.goto('/design-system', { waitUntil: 'networkidle' });
+  await page.goto('/', { waitUntil: 'networkidle' });
   const read = () =>
     page.evaluate(() => {
       const el = document.getElementById('forms')!;

@@ -1,3 +1,4 @@
+import containerQueries from "@tailwindcss/container-queries";
 import type { Config } from "tailwindcss";
 
 /**
@@ -219,6 +220,6 @@ const config: Config = {
       borderWidth: { 2: "2px" },
     },
   },
-  plugins: [],
+  plugins: [containerQueries],
 };
 export default config;

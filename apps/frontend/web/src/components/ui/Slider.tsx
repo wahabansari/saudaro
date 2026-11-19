@@ -1,58 +1,51 @@
 'use client';
 
+import { useState, type ComponentProps } from 'react';
 import * as RadixSlider from '@radix-ui/react-slider';
 import clsx from 'clsx';
-import { useState } from 'react';
 
-export type SliderProps = Omit<RadixSlider.SliderProps, 'children'> & {
+type Props = ComponentProps<typeof RadixSlider.Root> & {
+  'aria-label': string;
   thumbLabels?: string[];
-  formatValue?: (value: number) => string;
+  format?: (value: number) => string;
 };
 
+export type SliderProps = Props;
+
 export function Slider({
-  value,
-  defaultValue,
-  min = 0,
-  max = 100,
-  onValueChange,
   thumbLabels,
-  formatValue,
+  format,
+  defaultValue = [0],
+  value,
+  onValueChange,
   className,
   ...props
-}: SliderProps) {
-  const [inner, setInner] = useState(defaultValue ?? [min]);
-  const values = value ?? inner;
-
-  function change(next: number[]) {
-    setInner(next);
-    onValueChange?.(next);
-  }
-
+}: Props) {
+  const [inner, setInner] = useState(defaultValue);
+  const current = value ?? inner;
   return (
     <RadixSlider.Root
-      className={clsx('sa-slider', className)}
       role="group"
-      min={min}
-      max={max}
-      value={values}
-      onValueChange={change}
       {...props}
+      value={current}
+      onValueChange={(next) => {
+        setInner(next);
+        onValueChange?.(next);
+      }}
+      className={clsx('sa-slider w-full min-w-0', className)}
     >
       <RadixSlider.Track className="sa-slider__track">
         <RadixSlider.Range className="sa-slider__fill" />
       </RadixSlider.Track>
-      {values.map((current, index) => (
+      {current.map((n, i) => (
         <RadixSlider.Thumb
-          key={index}
-          className="sa-slider__thumb"
-          aria-label={thumbLabels?.[index]}
-          style={{ translate: `${((current - min) / (max - min)) * 100 - 50}% 0` }}
+          key={i}
+          aria-label={thumbLabels?.[i] ?? props['aria-label']}
+          className="block size-0 outline-none focus-visible:[&>span]:shadow-[0_0_0_6px_var(--focus-halo)]"
         >
-          {formatValue ? (
-            <span className="sa-slider__val" style={{ left: '50%', bottom: 20 }}>
-              {formatValue(current)}
-            </span>
-          ) : null}
+          <span className="sa-slider__thumb">
+            {format && <span className="sa-slider__val !bottom-5 !left-1/2">{format(n)}</span>}
+          </span>
         </RadixSlider.Thumb>
       ))}
     </RadixSlider.Root>

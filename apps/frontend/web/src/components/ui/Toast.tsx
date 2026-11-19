@@ -1,71 +1,42 @@
 'use client';
 
-import * as RadixToast from '@radix-ui/react-toast';
+import type { ComponentProps, ReactNode } from 'react';
+import * as T from '@radix-ui/react-toast';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef, CSSProperties } from 'react';
 import { Icon, type IconName } from '@/icons';
 
-export type ToastTone = 'success' | 'info' | 'warning' | 'danger';
+const TONES = {
+  info: { icon: 'info', style: 'bg-info-bg text-info-text' },
+  success: { icon: 'ok', style: 'bg-success-bg text-success-text' },
+  warning: { icon: 'warn', style: 'bg-warning-bg text-warning-text' },
+  danger: { icon: 'alert', style: 'bg-danger-bg text-danger-text' },
+} as const satisfies Record<string, { icon: IconName; style: string }>;
 
-export type ToastProviderProps = RadixToast.ToastProviderProps;
-export type ToastViewportProps = RadixToast.ToastViewportProps;
-export type ToastProps = Omit<RadixToast.ToastProps, 'title' | 'type'> & {
-  tone?: ToastTone;
-  title: string;
-  ref?: ComponentPropsWithRef<'li'>['ref'];
-};
+export const ToastProvider = T.Provider;
 
-const TOAST_DURATION_MS = 6000;
-
-const TONE_ICON: Record<ToastTone, IconName> = {
-  success: 'ok',
-  info: 'info',
-  warning: 'warn',
-  danger: 'alert',
-};
-
-const toneStyle = (tone: ToastTone): CSSProperties => ({
-  background: `var(--${tone}-bg)`,
-  color: `var(--${tone}-text)`,
-});
-
-export function ToastProvider({ duration = TOAST_DURATION_MS, ...props }: ToastProviderProps) {
-  return <RadixToast.Provider duration={duration} {...props} />;
+export function ToastViewport({ className, ...props }: ComponentProps<typeof T.Viewport>) {
+  return <T.Viewport className={clsx('m-0 grid max-w-full list-none gap-3 p-0', className)} {...props} />;
 }
 
-export function ToastViewport({ className, ...props }: ToastViewportProps) {
-  return (
-    <RadixToast.Viewport
-      asChild
-      className={clsx(
-        'fixed inset-x-4 top-4 z-toast flex flex-col items-center gap-3 md:inset-x-auto md:bottom-4 md:right-4 md:top-auto md:items-end',
-        className,
-      )}
-      {...props}
-    >
-      <div />
-    </RadixToast.Viewport>
-  );
-}
+export type ToastProps = Omit<ComponentProps<typeof T.Root>, 'title'> & {
+  tone?: keyof typeof TONES;
+  title: ReactNode;
+};
 
-export function Toast({ tone = 'success', title, children, className, ...props }: ToastProps) {
-  const isError = tone === 'danger';
+export function Toast({ tone = 'success', title, className, children, ...props }: ToastProps) {
+  const { icon, style } = TONES[tone];
+  const danger = tone === 'danger';
   return (
-    <RadixToast.Root
-      asChild
-      type={isError ? 'foreground' : 'background'}
-      role={isError ? 'alert' : 'status'}
-      {...props}
-    >
-      <div className={clsx('sa-toast', className)}>
-        <span className="sa-toast__icon" style={toneStyle(tone)}>
-          <Icon name={TONE_ICON[tone]} size={20} />
-        </span>
-        <div>
+    <T.Root type={danger ? 'foreground' : 'background'} className={clsx('sa-toast', className)} {...props}>
+      <span className={clsx('sa-toast__icon', style)}>
+        <Icon name={icon} size={20} />
+      </span>
+      <div role={danger ? 'alert' : 'status'} className="min-w-0">
+        <T.Title asChild>
           <strong>{title}</strong>
-          {children}
-        </div>
+        </T.Title>
+        {children}
       </div>
-    </RadixToast.Root>
+    </T.Root>
   );
 }

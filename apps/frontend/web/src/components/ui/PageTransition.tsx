@@ -1,6 +1,8 @@
-'use client';
+import type { ReactNode } from 'react';
+import { ViewTransitions } from 'next-view-transitions';
 
-import { Link, ViewTransitions } from 'next-view-transitions';
+export type PageTransitionProps = { children: ReactNode };
 
-export const PageTransition = ViewTransitions;
-export const TransitionLink = Link;
+export function PageTransition({ children }: PageTransitionProps) {
+  return <ViewTransitions>{children}</ViewTransitions>;
+}

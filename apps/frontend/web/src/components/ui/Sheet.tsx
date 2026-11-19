@@ -1,61 +1,36 @@
 'use client';
 
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import * as D from '@radix-ui/react-dialog';
 import clsx from 'clsx';
 import type { ComponentProps, ReactNode } from 'react';
 import { Icon } from '@/icons';
 
-export type SheetProps = ComponentProps<typeof DialogPrimitive.Root>;
-export type SheetTriggerProps = ComponentProps<typeof DialogPrimitive.Trigger>;
-export type SheetContentProps = Omit<ComponentProps<typeof DialogPrimitive.Content>, 'title'> & {
+export { Close as SheetClose } from '@radix-ui/react-dialog';
+
+export type SheetProps = Omit<ComponentProps<typeof D.Content>, 'title'> & {
+  trigger: ReactNode;
   title: ReactNode;
-  container?: HTMLElement;
-  overlayProps?: ComponentProps<'div'>;
 };
 
-export const Sheet = DialogPrimitive.Root;
-export const SheetClose = DialogPrimitive.Close;
-
-export function SheetTrigger({ className, ...props }: SheetTriggerProps) {
+export function Sheet({ trigger, title, children, className, ...props }: SheetProps) {
   return (
-    <DialogPrimitive.Trigger
-      className={clsx('data-[state=closed]:![animation:none]', className)}
-      {...props}
-    />
-  );
-}
-
-export function SheetContent({
-  title,
-  className,
-  children,
-  container,
-  overlayProps,
-  ...props
-}: SheetContentProps) {
-  const content = (
-    <DialogPrimitive.Content className={clsx('sa-sheet', className)} {...props}>
-      <div className="flex items-center justify-between">
-        <DialogPrimitive.Title className="m-0 text-h4">{title}</DialogPrimitive.Title>
-        <DialogPrimitive.Close className="sa-iconbtn" aria-label="Close">
-          <Icon name="x" size={20} />
-        </DialogPrimitive.Close>
-      </div>
-      {children}
-    </DialogPrimitive.Content>
-  );
-  const scrim = 'sa-scrim justify-items-end p-0';
-  return (
-    <DialogPrimitive.Portal container={container}>
-      {container ? (
-        <div {...overlayProps} className={clsx(scrim, overlayProps?.className)}>
-          {content}
-        </div>
-      ) : (
-        <DialogPrimitive.Overlay className={clsx(scrim, 'fixed inset-0 z-modal')}>
-          {content}
-        </DialogPrimitive.Overlay>
-      )}
-    </DialogPrimitive.Portal>
+    <D.Root>
+      <D.Trigger asChild className="data-[state=closed]:![animation:none]">
+        {trigger}
+      </D.Trigger>
+      <D.Portal>
+        <D.Overlay className="sa-scrim fixed inset-0 z-modal justify-items-end !p-0">
+          <D.Content className={clsx('sa-sheet', className)} aria-describedby={undefined} {...props}>
+            <div className="flex items-center justify-between">
+              <D.Title className="m-0 text-h4">{title}</D.Title>
+              <D.Close className="sa-iconbtn" aria-label="Close">
+                <Icon name="x" size={20} />
+              </D.Close>
+            </div>
+            {children}
+          </D.Content>
+        </D.Overlay>
+      </D.Portal>
+    </D.Root>
   );
 }

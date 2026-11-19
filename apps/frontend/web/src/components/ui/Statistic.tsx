@@ -1,21 +1,21 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { Icon } from '@/icons';
 
-export type StatisticProps = Omit<ComponentPropsWithRef<'div'>, 'children'> & {
-  label: ReactNode;
-  value: ReactNode;
-  delta?: ReactNode;
+export type StatisticProps = Omit<ComponentProps<'div'>, 'children'> & {
+  label: string;
+  value: string;
+  delta?: string;
   trend?: 'up' | 'down';
 };
 
 export function Statistic({ label, value, delta, trend = 'up', className, ...props }: StatisticProps) {
   return (
-    <div className={clsx('sa-stat', className)} {...props}>
+    <div className={clsx('sa-stat', 'min-w-0', className)} {...props}>
       <span className="sa-stat__label">{label}</span>
-      <span className="sa-stat__value">{value}</span>
-      {delta === undefined ? null : (
-        <span className={clsx('sa-stat__delta', `sa-stat__delta--${trend}`)}>
+      <span className="sa-stat__value break-words">{value}</span>
+      {delta && (
+        <span className={`sa-stat__delta sa-stat__delta--${trend}`}>
           <Icon name="arrow-right" size={20} />
           {delta}
         </span>

@@ -1,58 +1,51 @@
+import { useId, type ComponentProps } from 'react';
 import clsx from 'clsx';
-import { useId } from 'react';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
-import { Icon } from '@/icons';
-import type { IconName } from '@/icons';
+import { Icon, type IconName } from '@/icons';
 
-export type InputProps = Omit<ComponentPropsWithRef<'input'>, 'size'> & {
-  label?: ReactNode;
-  hint?: ReactNode;
-  error?: ReactNode;
+type Props = Omit<ComponentProps<'input'>, 'size'> & {
+  label?: string;
+  hint?: string;
+  error?: string;
   icon?: IconName;
   size?: 'sm' | 'md' | 'lg';
 };
 
-export function Input({
-  label,
-  hint,
-  error,
-  icon,
-  size = 'md',
-  required,
-  id: idProp,
-  className,
-  'aria-describedby': describedBy,
-  ...props
-}: InputProps) {
-  const autoId = useId();
-  const id = idProp ?? autoId;
-  const messageId = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+export type InputProps = Props;
+
+export function Input({ label, hint, error, icon, size = 'md', className, id, required, ...props }: Props) {
+  const uid = useId();
+  const inputId = id ?? uid;
+  const noteId = `${inputId}-note`;
   const control = (
     <input
-      id={id}
-      className={clsx('sa-input', size !== 'md' && `sa-input--${size}`, icon && 'sa-input--icon', className)}
-      aria-required={required || undefined}
-      aria-invalid={error ? true : undefined}
-      aria-describedby={clsx(describedBy, messageId) || undefined}
       {...props}
+      id={inputId}
+      required={required}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={error || hint ? noteId : undefined}
+      className={clsx(
+        'sa-input min-w-0',
+        size !== 'md' && `sa-input--${size}`,
+        icon && 'sa-input--icon',
+        className,
+      )}
     />
   );
-
   return (
-    <div className="sa-field">
-      {label ? (
-        <label className="sa-label" htmlFor={id}>
+    <div className="sa-field min-w-0">
+      {label && (
+        <label className="sa-label" htmlFor={inputId}>
           {label}
-          {required ? (
+          {required && (
             <>
               {' '}
               <span className="sa-req" aria-hidden="true">
                 *
               </span>
             </>
-          ) : null}
+          )}
         </label>
-      ) : null}
+      )}
       {icon ? (
         <div className="sa-inputwrap">
           <Icon name={icon} size={20} />
@@ -62,15 +55,17 @@ export function Input({
         control
       )}
       {error ? (
-        <span id={messageId} className="sa-error">
+        <span id={noteId} className="sa-error">
           <Icon name="alert" size={14} />
           {error}
         </span>
-      ) : hint ? (
-        <span id={messageId} className="sa-hint">
-          {hint}
-        </span>
-      ) : null}
+      ) : (
+        hint && (
+          <span id={noteId} className="sa-hint">
+            {hint}
+          </span>
+        )
+      )}
     </div>
   );
 }

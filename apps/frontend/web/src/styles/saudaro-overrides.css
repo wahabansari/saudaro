@@ -1,0 +1,332 @@
+/* Product changes layered on top of the design kit. The kit files stay untouched; this file loads right after them. */
+
+/* ---------- Text: stylistic sets (numerals keep their own settings through .num / .sa-num / .sa-mono) */
+body {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* ---------- Pointer cursor on everything that opens or toggles */
+button,
+[role="button"],
+[role="combobox"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+select,
+summary,
+label[for],
+.sa-check,
+.sa-radio,
+.sa-switch,
+.sa-select {
+  cursor: pointer;
+}
+button:disabled,
+[aria-disabled="true"],
+:disabled {
+  cursor: not-allowed;
+}
+
+/* ---------- Text fields: 1px border, no outline ring, Bootstrap-style offset shadow on focus */
+.sa-input,
+.sa-select,
+.sa-textarea {
+  transition: border-color 150ms var(--ease-pop), box-shadow 150ms var(--ease-pop);
+}
+.sa-input:focus-visible,
+.sa-select:focus-visible,
+.sa-textarea:focus-visible,
+.sa-search input:focus-visible,
+.sa-combo__search input:focus-visible {
+  outline: 0;
+  border-color: var(--action);
+  box-shadow: 0 0 0 4px var(--focus-halo);
+}
+.sa-input[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 4px var(--danger-100);
+}
+
+/* ---------- Checkbox and radio: no pill background, only the control itself changes */
+.sa-check::before,
+.sa-radio::before {
+  display: none;
+}
+.sa-check:has(input:checked),
+.sa-radio:has(input:checked),
+.sa-check:has(input:indeterminate) {
+  color: var(--ink);
+  font-weight: inherit;
+}
+.sa-check__box {
+  transition: background-color 180ms var(--ease-pop), border-color 180ms var(--ease-pop);
+}
+.sa-check input:checked + .sa-check__box,
+.sa-check input:indeterminate + .sa-check__box {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--white);
+  animation: sa-check-pop 260ms var(--ease-pop);
+}
+.sa-check__box svg {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 280ms var(--ease-pop) 40ms;
+}
+.sa-check input:checked + .sa-check__box svg,
+.sa-check input:indeterminate + .sa-check__box svg {
+  clip-path: inset(0 0 0 0);
+}
+.sa-radio__dot {
+  background: var(--white);
+  box-shadow: inset 0 0 0 10px var(--white), inset 0 0 0 10px var(--action);
+  transition: box-shadow 260ms var(--ease-pop), border-color 180ms var(--ease-pop);
+}
+.sa-radio input:checked + .sa-radio__dot {
+  background: var(--white);
+  border-width: 1px;
+  border-color: var(--action);
+  box-shadow: inset 0 0 0 4px var(--white), inset 0 0 0 10px var(--action);
+}
+@keyframes sa-check-pop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---------- Trailing chevron of anything that opens: rotates while open */
+.sa-chev {
+  transition: transform 220ms var(--ease-pop);
+}
+[aria-expanded="true"] > .sa-chev,
+[data-state="open"] > .sa-chev,
+.sa-acc__btn[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.sa-acc__btn svg {
+  transition: transform 260ms var(--ease-pop);
+}
+
+/* ---------- Opening and closing of dropdowns, menus, popovers and tooltips (slide + fade from the anchor) */
+[data-side="bottom"] {
+  --sx: 0px;
+  --sy: -6px;
+}
+[data-side="top"] {
+  --sx: 0px;
+  --sy: 6px;
+}
+[data-side="left"] {
+  --sx: 6px;
+  --sy: 0px;
+}
+[data-side="right"] {
+  --sx: -6px;
+  --sy: 0px;
+}
+@keyframes sa-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--sx, 0px), var(--sy, -6px)) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sa-pop-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--sx, 0px), var(--sy, -4px)) scale(0.97);
+  }
+}
+.sa-menu,
+.sa-popover,
+.sa-cal,
+.sa-fil,
+.sa-cmd,
+.sa-anim-pop {
+  transform-origin: var(--radix-popper-transform-origin, var(--pop-origin, top left));
+}
+.sa-menu[role="listbox"] {
+  transform-origin: var(--radix-select-content-transform-origin, top left);
+}
+.sa-anim-pop {
+  animation: sa-pop-in var(--dur-in) var(--ease-pop) both;
+}
+@keyframes sa-slide-fade-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--sx, 0px), var(--sy, -8px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.sa-tip {
+  animation: sa-slide-fade-in 220ms var(--ease-pop) both;
+}
+.sa-tip[data-side="bottom"] {
+  --sy: -8px;
+}
+.sa-tip[data-side="top"] {
+  --sy: 8px;
+}
+.sa-tip[data-side="left"] {
+  --sx: 8px;
+}
+.sa-tip[data-side="right"] {
+  --sx: -8px;
+}
+
+/* ---------- Sheet slides in from the edge, scrim fades */
+@keyframes sa-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sa-slide-out {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes sa-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.sa-sheet[data-state="open"] {
+  animation: sa-slide-in 340ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.sa-sheet[data-state="closed"] {
+  animation: sa-slide-out 260ms cubic-bezier(0.4, 0, 0.6, 1) both !important;
+}
+.sa-scrim[data-state="closed"] {
+  animation: sa-fade-out 260ms ease-in both !important;
+}
+
+/* ---------- Toast enters from the side */
+@keyframes sa-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sa-toast-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+}
+.sa-toast[data-state="open"] {
+  animation: sa-toast-in 360ms var(--ease-pop) both;
+}
+.sa-toast[data-state="closed"] {
+  animation: sa-toast-out 200ms ease-in both !important;
+}
+
+/* ---------- Accordion panel opens and closes smoothly */
+.sa-acc__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 300ms var(--ease-pop);
+}
+.sa-acc__body[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+.sa-acc__body > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ---------- Tabs: one indicator slides between the tabs */
+.sa-tabs {
+  position: relative;
+}
+.sa-tab[aria-selected="true"] {
+  border-bottom-color: transparent;
+}
+.sa-tab {
+  transition: color 180ms var(--ease-pop), background-color 180ms var(--ease-pop);
+}
+.sa-tab-ind {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  background: var(--action);
+  pointer-events: none;
+  transition: transform 320ms var(--ease-pop), width 320ms var(--ease-pop);
+}
+
+/* ---------- Data grid: no card frame, a plain bordered table inside its container */
+.sa-grid {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.sa-grid__body {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  outline: 0;
+}
+.sa-gt th,
+.sa-gt td {
+  border-right: 1px solid var(--grey-200);
+  border-bottom: 1px solid var(--grey-200);
+}
+.sa-gt tr > :last-child {
+  border-right: 0;
+}
+.sa-gt tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ---------- Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .sa-anim-pop,
+  .sa-tip,
+  .sa-sheet,
+  .sa-scrim,
+  .sa-toast,
+  .sa-check__box,
+  .sa-radio__dot,
+  .sa-chev,
+  .sa-acc__body,
+  .sa-acc__btn svg,
+  .sa-tab-ind {
+    animation: none !important;
+    transition: none !important;
+  }
+}

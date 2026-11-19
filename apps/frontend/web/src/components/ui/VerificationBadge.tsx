@@ -1,60 +1,45 @@
 import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import { Icon, type IconName } from '@/icons';
+import { Icon } from '@/icons';
 
-export type VerificationBadgeProps = Omit<ComponentProps<'span'>, 'children'> & {
-  variant: 'summary' | 'level' | 'pending';
-  /** Level name for `level` and `pending`, for example "Business registration". */
-  label?: string;
-  /** Verified level count for `summary`. */
-  levels?: number;
-};
+const variants = {
+  summary: { badge: 'success', icon: 'verified' },
+  level: { badge: 'info', icon: 'shield' },
+  pending: { badge: 'neutral', icon: 'clock' },
+} as const;
 
-const TONE = { summary: 'success', level: 'info', pending: 'neutral' } as const;
-const ICON: Record<VerificationBadgeProps['variant'], IconName> = {
-  summary: 'verified',
-  level: 'shield',
-  pending: 'clock',
-};
+export type VerificationBadgeProps = ComponentProps<'span'> & { variant?: keyof typeof variants };
 
-/** The word "Verified" always accompanies the shield; lapsed levels stay visible as neutral. */
 export function VerificationBadge({
-  variant,
-  label,
-  levels = 0,
+  variant = 'summary',
   className,
+  children,
   ...rest
 }: VerificationBadgeProps) {
+  const { badge, icon } = variants[variant];
   return (
-    <span className={clsx('sa-badge', `sa-badge--${TONE[variant]}`, className)} {...rest}>
-      <Icon name={ICON[variant]} size={20} />
-      {variant === 'summary' ? `Verified · ${levels} ${levels === 1 ? 'level' : 'levels'}` : label}
+    <span className={clsx('sa-badge', `sa-badge--${badge}`, 'max-w-full', className)} {...rest}>
+      <Icon name={icon} />
+      {children}
     </span>
   );
 }
 
-export type VerificationListItem = {
-  label: string;
-  /** Preformatted caption, for example "Confirmed 02 Feb 2026". */
-  detail: string;
-  granted: boolean;
-};
-
-export type VerificationListProps = Omit<ComponentProps<'ul'>, 'children'> & {
-  items: readonly VerificationListItem[];
+export type VerificationListProps = ComponentProps<'ul'> & {
+  items: { title: string; detail: string; done?: boolean }[];
 };
 
 export function VerificationList({ items, className, ...rest }: VerificationListProps) {
   return (
     <ul className={clsx('sa-vlist', className)} {...rest}>
-      {items.map((item) => (
-        <li key={item.label}>
-          <span className={item.granted ? 'ok' : 'no'}>
-            <Icon name={item.granted ? 'ok' : 'clock'} size={20} />
+      {items.map(({ title, detail, done }) => (
+        <li key={title}>
+          <span className={done ? 'ok' : 'no'}>
+            <Icon name={done ? 'ok' : 'clock'} />
           </span>
           <span>
-            <b>{item.label}</b>
-            <small>{item.detail}</small>
+            <b>{title}</b>
+            <small>{detail}</small>
           </span>
         </li>
       ))}

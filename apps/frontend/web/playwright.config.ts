@@ -12,7 +12,7 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${PORT}`, browserName: 'chromium' },
   webServer: {
     command: `npx next dev -p ${PORT}`,
-    url: `http://localhost:${PORT}/design-system`,
+    url: `http://localhost:${PORT}/`,
     reuseExistingServer: false,
     timeout: 300_000,
   },

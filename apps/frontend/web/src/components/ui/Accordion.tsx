@@ -1,42 +1,45 @@
-import * as AccordionPrimitive from '@radix-ui/react-accordion';
+'use client';
+
 import clsx from 'clsx';
-import type { ComponentProps } from 'react';
+import { Fragment, useId, useState, type ComponentProps, type ReactNode } from 'react';
 import { Icon } from '@/icons';
 
-const BORDER_BETWEEN = '[&:not(:first-child)]:[border-top:1px_solid_var(--card-border)]';
-const KEEP_CLOSED_VISIBLE = 'data-[state=closed]:![animation:none]';
+export type AccordionProps = Omit<ComponentProps<'div'>, 'defaultValue'> & {
+  items: { value: string; title: ReactNode; content?: ReactNode }[];
+  defaultValue?: string;
+};
 
-export type AccordionProps = ComponentProps<typeof AccordionPrimitive.Root>;
-export type AccordionItemProps = ComponentProps<typeof AccordionPrimitive.Item>;
-export type AccordionTriggerProps = ComponentProps<typeof AccordionPrimitive.Trigger>;
-export type AccordionContentProps = ComponentProps<typeof AccordionPrimitive.Content>;
-
-export function Accordion({ className, ...props }: AccordionProps) {
-  return <AccordionPrimitive.Root className={clsx('sa-acc', className)} {...props} />;
-}
-
-export function AccordionItem({ className, ...props }: AccordionItemProps) {
+export function Accordion({ items, defaultValue, className, ...props }: AccordionProps) {
+  const id = useId();
+  const [open, setOpen] = useState(defaultValue);
   return (
-    <AccordionPrimitive.Item className={clsx(BORDER_BETWEEN, KEEP_CLOSED_VISIBLE, className)} {...props} />
-  );
-}
-
-export function AccordionTrigger({ className, children, ...props }: AccordionTriggerProps) {
-  return (
-    <AccordionPrimitive.Header className={KEEP_CLOSED_VISIBLE}>
-      <AccordionPrimitive.Trigger className={clsx('sa-acc__btn', KEEP_CLOSED_VISIBLE, className)} {...props}>
-        {children}
-        <Icon name="chevron-down" size={20} />
-      </AccordionPrimitive.Trigger>
-    </AccordionPrimitive.Header>
-  );
-}
-
-export function AccordionContent({ className, ...props }: AccordionContentProps) {
-  return (
-    <AccordionPrimitive.Content
-      className={clsx('sa-acc__panel', KEEP_CLOSED_VISIBLE, className)}
-      {...props}
-    />
+    <div className={clsx('sa-acc', className)} {...props}>
+      {items.map(({ value, title, content }, i) => (
+        <Fragment key={value}>
+          <button
+            type="button"
+            id={`${id}-${value}-t`}
+            className="sa-acc__btn"
+            aria-expanded={open === value}
+            aria-controls={open === value ? `${id}-${value}` : undefined}
+            style={i > 0 ? { borderTop: '1px solid var(--card-border)' } : undefined}
+            onClick={() => setOpen(open === value ? undefined : value)}
+          >
+            {title}
+            <Icon name="chevron-down" />
+          </button>
+          {open === value && content && (
+            <div
+              role="region"
+              id={`${id}-${value}`}
+              aria-labelledby={`${id}-${value}-t`}
+              className="sa-acc__panel"
+            >
+              {content}
+            </div>
+          )}
+        </Fragment>
+      ))}
+    </div>
   );
 }

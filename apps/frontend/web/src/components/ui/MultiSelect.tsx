@@ -1,116 +1,109 @@
 'use client';
 
-import * as PopoverPrimitive from '@radix-ui/react-popover';
+import * as P from '@radix-ui/react-popover';
 import clsx from 'clsx';
-import { useId, useState, type ComponentProps, type KeyboardEvent } from 'react';
+import { useId, useState, type ComponentProps } from 'react';
 import { Icon } from '@/icons';
 import { ComboPanel, type ComboOption } from './ComboPanel';
 
-export type MultiSelectOption = ComboOption;
-
-export type MultiSelectProps = Omit<ComponentProps<'div'>, 'children'> & {
-  options: MultiSelectOption[];
-  values: string[];
-  onValuesChange: (values: string[]) => void;
-  placeholder: string;
-  searchPlaceholder: string;
-  emptyLabel?: string;
-  open?: boolean;
-  container?: HTMLElement;
-};
-
 const MAX_TAGS = 3;
+
+export type MultiSelectProps = Omit<ComponentProps<'div'>, 'onChange' | 'defaultValue'> & {
+  options: ComboOption[];
+  label: string;
+  searchLabel?: string;
+  placeholder?: string;
+  defaultValue?: string[];
+  onChange?: (value: string[]) => void;
+};
 
 export function MultiSelect({
   options,
-  values,
-  onValuesChange,
-  placeholder,
-  searchPlaceholder,
-  emptyLabel = 'No results for',
-  open: openProp,
-  container,
+  label,
+  searchLabel = 'Search',
+  placeholder = 'Select',
+  defaultValue = [],
+  onChange,
   className,
   ...props
 }: MultiSelectProps) {
-  const [openState, setOpen] = useState(false);
-  const open = openProp ?? openState;
-  const listId = useId();
-  const chosen = values.flatMap((value) => options.find((option) => option.value === value) ?? []);
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(defaultValue);
 
-  function toggle(value: string) {
-    onValuesChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  function update(next: string[]) {
+    setValue(next);
+    onChange?.(next);
   }
-
-  function handleTriggerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-    event.preventDefault();
-    setOpen((current) => !current);
-  }
+  const remove = (v: string) => update(value.filter((x) => x !== v));
+  const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? v;
 
   return (
-    <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
-      <div className={clsx('sa-combo', className)} data-open={open ? '' : undefined}>
-        <PopoverPrimitive.Trigger asChild>
-          <div
-            role="combobox"
-            tabIndex={0}
-            aria-haspopup="listbox"
-            {...props}
-            className="sa-combo__trigger data-[state=closed]:![animation:none]"
-            onKeyDown={handleTriggerKeyDown}
-          >
-            {chosen.length ? (
+    <div className={clsx('sa-field @container', className)} {...props}>
+      <label htmlFor={id} className="sa-label">
+        {label}
+      </label>
+      <P.Root open={open} onOpenChange={setOpen}>
+        <div className="sa-combo group" data-open={open || undefined}>
+          <P.Anchor asChild>
+            <div
+              className="sa-combo__trigger"
+              onClick={(e) => {
+                if (!(e.target as HTMLElement).closest('button')) setOpen(true);
+              }}
+            >
               <span className="sa-combo__tags">
-                {chosen.slice(0, MAX_TAGS).map((option) => (
-                  <span key={option.value} className="sa-tag">
-                    {option.label}
+                {value.length === 0 && <span className="sa-combo__ph">{placeholder}</span>}
+                {value.slice(0, MAX_TAGS).map((v) => (
+                  <span key={v} className="sa-tag">
+                    {labelOf(v)}
                     <button
                       type="button"
-                      aria-label={`Remove ${option.label}`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggle(option.value);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Delete') return;
-                        event.preventDefault();
-                        toggle(option.value);
-                      }}
+                      aria-label={`Remove ${labelOf(v)}`}
+                      onClick={() => remove(v)}
+                      onKeyDown={(e) => e.key === 'Delete' && remove(v)}
                     >
-                      <Icon name="x" size={20} />
+                      <Icon name="x" size={12} />
                     </button>
                   </span>
                 ))}
-                {chosen.length > MAX_TAGS ? (
-                  <span className="sa-tag">{`+${chosen.length - MAX_TAGS}`}</span>
-                ) : null}
+                {value.length > MAX_TAGS && <span className="sa-tag">+{value.length - MAX_TAGS}</span>}
               </span>
-            ) : (
-              <span className="sa-combo__ph">{placeholder}</span>
-            )}
-            <Icon name="chevron-down" size={20} />
-          </div>
-        </PopoverPrimitive.Trigger>
-      </div>
-      <ComboPanel
-        container={container}
-        options={options}
-        selected={values}
-        multiple
-        placeholder={searchPlaceholder}
-        emptyLabel={emptyLabel}
-        listId={listId}
-        onPick={toggle}
-        onBackspaceEmpty={() => onValuesChange(values.slice(0, -1))}
-      >
-        <div className="sa-combo__foot">
-          <span>{`${values.length} selected`}</span>
-          <button type="button" className="sa-btn sa-btn--text sa-btn--sm" onClick={() => onValuesChange([])}>
-            Clear
-          </button>
+              <P.Trigger
+                id={id}
+                aria-haspopup="listbox"
+                className="grid cursor-pointer place-items-center border-0 bg-transparent p-0 text-inherit focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-on-card data-[state=closed]:![animation:none]"
+              >
+                <Icon name="chevron-down" size={20} className="group-data-[open]:rotate-180" />
+              </P.Trigger>
+            </div>
+          </P.Anchor>
         </div>
-      </ComboPanel>
-    </PopoverPrimitive.Root>
+        <P.Portal>
+          <P.Content
+            sideOffset={6}
+            collisionPadding={16}
+            aria-label={label}
+            className="sa-combo__panel z-toast w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)]"
+          >
+            <ComboPanel
+              multiple
+              options={options}
+              selected={value}
+              onPick={(v) => update(value.includes(v) ? value.filter((x) => x !== v) : [...value, v])}
+              onEmptyBackspace={() => update(value.slice(0, -1))}
+              searchLabel={searchLabel}
+            >
+              <div className="sa-combo__foot">
+                <span>{value.length} selected</span>
+                <button type="button" className="sa-btn sa-btn--text sa-btn--sm" onClick={() => update([])}>
+                  Clear
+                </button>
+              </div>
+            </ComboPanel>
+          </P.Content>
+        </P.Portal>
+      </P.Root>
+    </div>
   );
 }

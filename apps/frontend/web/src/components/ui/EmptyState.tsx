@@ -1,27 +1,22 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import clsx from 'clsx';
 import { Icon, type IconName } from '@/icons';
 
-export type EmptyStateProps = Omit<HTMLAttributes<HTMLDivElement>, 'title'> & {
+export type EmptyStateProps = Omit<ComponentProps<'div'>, 'title'> & {
   icon: IconName;
   title: string;
-  description: string;
-  /** The one primary action. */
-  action?: ReactNode;
-  /** Optional secondary link. */
-  link?: ReactNode;
+  description?: ReactNode;
 };
 
-export function EmptyState({ icon, title, description, action, link, className, ...rest }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, className, children, ...props }: EmptyStateProps) {
   return (
-    <div className={clsx('sa-empty', className)} {...rest}>
+    <div {...props} className={clsx('sa-empty', className)}>
       <div className="sa-empty__icon">
-        <Icon name={icon} size={32} />
+        <Icon name={icon} />
       </div>
       <h3>{title}</h3>
-      <p>{description}</p>
-      {action}
-      {link}
+      {description && <p>{description}</p>}
+      {children}
     </div>
   );
 }

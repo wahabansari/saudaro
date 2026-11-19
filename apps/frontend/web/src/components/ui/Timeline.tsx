@@ -1,39 +1,45 @@
+import type { ComponentProps, ReactNode } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { Icon, type IconName } from '@/icons';
 
-export type TimelineProps = ComponentPropsWithRef<'ol'>;
-export type TimelineItemProps = Omit<ComponentPropsWithRef<'li'>, 'title'> & {
-  state?: 'done' | 'now' | 'upcoming';
-  icon?: IconName;
+export function Timeline({ className, ...props }: ComponentProps<'ol'>) {
+  return (
+    <div className="@container min-w-0 max-w-full">
+      <ol className={clsx('sa-timeline', className)} {...props} />
+    </div>
+  );
+}
+
+export type TimelineItemProps = Omit<ComponentProps<'li'>, 'title'> & {
+  icon: IconName;
   title: ReactNode;
+  status?: 'done' | 'now';
+  badge?: ReactNode;
   meta?: ReactNode;
   text?: ReactNode;
 };
 
-export function Timeline({ className, ...props }: TimelineProps) {
-  return <ol className={clsx('sa-timeline', className)} {...props} />;
-}
-
 export function TimelineItem({
-  state = 'upcoming',
   icon,
   title,
+  status,
+  badge,
   meta,
   text,
   className,
   ...props
 }: TimelineItemProps) {
-  const iconName = icon ?? (state === 'done' ? 'check' : 'circle');
   return (
-    <li className={clsx('sa-tl', state !== 'upcoming' && `sa-tl--${state}`, className)} {...props}>
+    <li className={clsx('sa-tl', status && `sa-tl--${status}`, className)} {...props}>
       <span className="sa-tl__dot">
-        <Icon name={iconName} size={20} />
+        <Icon name={icon} size={20} />
       </span>
-      <div>
-        <div className="sa-tl__title">{title}</div>
-        {meta ? <div className="sa-tl__meta">{meta}</div> : null}
-        {text ? <div className="sa-tl__text">{text}</div> : null}
+      <div className="min-w-0">
+        <div className="sa-tl__title">
+          {title} {badge}
+        </div>
+        {meta && <div className="sa-tl__meta break-words">{meta}</div>}
+        {text && <div className="sa-tl__text">{text}</div>}
       </div>
     </li>
   );

@@ -1,56 +1,32 @@
 'use client';
 
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import * as D from '@radix-ui/react-dialog';
 import clsx from 'clsx';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
-export type DialogProps = ComponentProps<typeof DialogPrimitive.Root>;
-export type DialogTriggerProps = ComponentProps<typeof DialogPrimitive.Trigger>;
-export type DialogContentProps = ComponentProps<typeof DialogPrimitive.Content> & {
-  container?: HTMLElement;
-  overlayProps?: ComponentProps<'div'>;
+export { Close as DialogClose } from '@radix-ui/react-dialog';
+
+export type DialogProps = Omit<ComponentProps<typeof D.Content>, 'title'> & {
+  trigger: ReactNode;
+  title: ReactNode;
+  actions: ReactNode;
 };
-export type DialogTitleProps = ComponentProps<typeof DialogPrimitive.Title>;
-export type DialogDescriptionProps = ComponentProps<typeof DialogPrimitive.Description>;
-export type DialogActionsProps = ComponentProps<'div'>;
 
-export const Dialog = DialogPrimitive.Root;
-export const DialogClose = DialogPrimitive.Close;
-
-export function DialogTrigger({ className, ...props }: DialogTriggerProps) {
+export function Dialog({ trigger, title, actions, children, className, ...props }: DialogProps) {
   return (
-    <DialogPrimitive.Trigger
-      className={clsx('data-[state=closed]:![animation:none]', className)}
-      {...props}
-    />
+    <D.Root>
+      <D.Trigger asChild className="data-[state=closed]:![animation:none]">
+        {trigger}
+      </D.Trigger>
+      <D.Portal>
+        <D.Overlay className="sa-scrim fixed inset-0 z-modal">
+          <D.Content className={clsx('sa-dialog', className)} {...props}>
+            <D.Title>{title}</D.Title>
+            <D.Description>{children}</D.Description>
+            <div className="sa-dialog__actions">{actions}</div>
+          </D.Content>
+        </D.Overlay>
+      </D.Portal>
+    </D.Root>
   );
-}
-
-export function DialogContent({ className, container, overlayProps, ...props }: DialogContentProps) {
-  const content = <DialogPrimitive.Content className={clsx('sa-dialog', className)} {...props} />;
-  return (
-    <DialogPrimitive.Portal container={container}>
-      {container ? (
-        <div {...overlayProps} className={clsx('sa-scrim', overlayProps?.className)}>
-          {content}
-        </div>
-      ) : (
-        <DialogPrimitive.Overlay className="sa-scrim fixed inset-0 z-modal">
-          {content}
-        </DialogPrimitive.Overlay>
-      )}
-    </DialogPrimitive.Portal>
-  );
-}
-
-export function DialogTitle(props: DialogTitleProps) {
-  return <DialogPrimitive.Title {...props} />;
-}
-
-export function DialogDescription(props: DialogDescriptionProps) {
-  return <DialogPrimitive.Description {...props} />;
-}
-
-export function DialogActions({ className, ...props }: DialogActionsProps) {
-  return <div className={clsx('sa-dialog__actions', className)} {...props} />;
 }

@@ -1,48 +1,42 @@
 'use client';
 
+import { useState, type ComponentProps } from 'react';
 import clsx from 'clsx';
-import { useState } from 'react';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
 
-export type ButtonGroupItem = { value: string; label: ReactNode };
-
-export type ButtonGroupProps = Omit<
-  ComponentPropsWithRef<'div'>,
-  'children' | 'defaultValue' | 'onChange'
-> & {
-  items: ButtonGroupItem[];
+type Props = Omit<ComponentProps<'div'>, 'onChange' | 'defaultValue'> & {
+  'aria-label': string;
+  options: string[];
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
 };
 
+export type ButtonGroupProps = Props;
+
 export function ButtonGroup({
-  items,
+  options,
   value,
-  defaultValue,
+  defaultValue = options[0],
   onValueChange,
   className,
   ...props
-}: ButtonGroupProps) {
+}: Props) {
   const [inner, setInner] = useState(defaultValue);
-  const selected = value ?? inner;
-
-  function select(next: string) {
-    setInner(next);
-    onValueChange?.(next);
-  }
-
+  const current = value ?? inner;
   return (
-    <div className={clsx('sa-btngroup', className)} role="group" {...props}>
-      {items.map((item) => (
+    <div role="group" {...props} className={clsx('sa-btngroup max-w-full', className)}>
+      {options.map((option) => (
         <button
-          key={item.value}
+          key={option}
           type="button"
           className="sa-btn sa-btn--outline"
-          aria-pressed={item.value === selected}
-          onClick={() => select(item.value)}
+          aria-pressed={option === current}
+          onClick={() => {
+            setInner(option);
+            onValueChange?.(option);
+          }}
         >
-          {item.label}
+          {option}
         </button>
       ))}
     </div>

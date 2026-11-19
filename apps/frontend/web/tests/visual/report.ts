@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { components, readJson } from './helpers';
 
-type Px = { status: 'PASS' | 'DIFF' | 'MISSING'; pct?: number; px?: number; preview?: number[]; gallery?: number[] };
+type Px = { status: 'PASS' | 'DIFF' | 'MISSING' | 'N/A'; pct?: number; px?: number; preview?: number[]; gallery?: number[] };
 type Row = { impact: string; rule: string; selector: string; wrapper: string | null };
 type A11y = {
   axe: Record<string, Row[]>;
@@ -11,7 +11,7 @@ type A11y = {
 };
 
 const CAUSES_FILE = path.join(__dirname, 'causes.json'); // hand-written probable causes, by component
-const fmt = (r?: Px) => (!r ? 'n/a' : r.status === 'MISSING' ? 'MISSING' : r.status === 'PASS' ? '0' : `${r.pct!.toFixed(2)}% (${r.px} px)`);
+const fmt = (r?: Px) => (!r ? 'n/a' : r.status === 'N/A' ? 'N/A' : r.status === 'MISSING' ? 'MISSING' : r.status === 'PASS' ? '0' : `${r.pct!.toFixed(2)}% (${r.px} px)`);
 const sizeNote = (r?: Px) => (r?.status === 'DIFF' && r.preview!.join() !== r.gallery!.join() ? `size ${r.preview!.join('x')} vs ${r.gallery!.join('x')}` : '');
 
 function pixelSection() {
@@ -19,17 +19,17 @@ function pixelSection() {
   const causes: Record<string, string> = fs.existsSync(CAUSES_FILE) ? JSON.parse(fs.readFileSync(CAUSES_FILE, 'utf8')) : {};
   const rows = components.map((name) => {
     const [a, b] = [d[name], m[name]];
-    const status = [a, b].some((r) => r?.status === 'MISSING') ? 'MISSING' : [a, b].every((r) => r?.status === 'PASS') ? 'PASS' : 'DIFF';
+    const status = a?.status === 'N/A' ? 'N/A' : [a, b].some((r) => r?.status === 'MISSING') ? 'MISSING' : [a, b].every((r) => r?.status === 'PASS') ? 'PASS' : 'DIFF';
     const severity = status === 'DIFF' ? Math.max(a?.pct ?? 0, b?.pct ?? 0) : -1;
     const note = [causes[name], sizeNote(a) && `1440 ${sizeNote(a)}`, sizeNote(b) && `375 ${sizeNote(b)}`].filter(Boolean).join('; ');
     return { name, a, b, status, severity, note };
   });
-  const order = { DIFF: 0, MISSING: 1, PASS: 2 };
+  const order = { DIFF: 0, MISSING: 1, PASS: 2, 'N/A': 3 };
   rows.sort((x, y) => order[x.status] - order[y.status] || y.severity - x.severity || x.name.localeCompare(y.name));
   const count = (s: string) => rows.filter((r) => r.status === s).length;
   return [
     `Threshold 0.1 (pixelmatch). Mismatch is a share of the larger of the two screenshots; size differences count as mismatched pixels.`,
-    `PASS ${count('PASS')} / DIFF ${count('DIFF')} / MISSING ${count('MISSING')} of ${rows.length}. DIFF sorted by worst-viewport mismatch.`,
+    `PASS ${count('PASS')} / DIFF ${count('DIFF')} / MISSING ${count('MISSING')} / N/A ${count('N/A')} (overlays that open from a trigger, tested by keyboard) of ${rows.length}. DIFF sorted by worst-viewport mismatch.`,
     `Images: \`apps/frontend/web/tests/visual/.output/diff/<width>/<Name>.{preview,gallery,diff}.png\` (git-ignored).`,
     '',
     '| Component | 1440 mismatch | 375 mismatch | Status | Probable cause |',
@@ -39,7 +39,7 @@ function pixelSection() {
 }
 
 const IMPACT = ['critical', 'serious', 'moderate', 'minor'];
-const cell = (s: string) => s.replace(/\|/g, '\|');
+const cell = (s: string) => s.replaceAll('|', '\\|');
 function group(rows: Row[]) {
   const map = new Map<string, Row[]>();
   for (const r of rows) {

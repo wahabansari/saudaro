@@ -1,68 +1,55 @@
 'use client';
 
+import { useRef, useState, type ComponentProps } from 'react';
 import clsx from 'clsx';
-import { useRef, useState } from 'react';
-import type { ChangeEvent, ComponentPropsWithRef, DragEvent, MouseEvent, ReactNode } from 'react';
 import { Icon } from '@/icons';
 
-export type FileUploadProps = Omit<ComponentPropsWithRef<'div'>, 'children' | 'onDrop'> & {
+type Props = Omit<ComponentProps<'div'>, 'onDrop'> & {
+  hint?: string;
   accept?: string;
   multiple?: boolean;
-  hint?: ReactNode;
+  inputLabel?: string;
   onFiles?: (files: File[]) => void;
-  over?: boolean;
 };
 
+export type FileUploadProps = Props;
+
 export function FileUpload({
-  accept,
-  multiple = false,
   hint,
+  accept,
+  multiple,
+  inputLabel = 'Choose files',
   onFiles,
-  over: overProp,
   className,
   ...props
-}: FileUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const over = overProp ?? dragging;
-
-  function pick(files: FileList | null) {
-    const list = Array.from(files ?? []);
-    if (list.length) onFiles?.(multiple ? list : list.slice(0, 1));
-  }
-
-  function handleClick(event: MouseEvent) {
-    if (event.target === inputRef.current) return;
-    event.preventDefault();
-    inputRef.current?.click();
-  }
-
-  function handleDragOver(event: DragEvent) {
-    event.preventDefault();
-    setDragging(true);
-  }
-
-  function handleDrop(event: DragEvent) {
-    event.preventDefault();
-    setDragging(false);
-    pick(event.dataTransfer.files);
-  }
-
-  function handleChange(event: ChangeEvent<HTMLInputElement>) {
-    pick(event.target.files);
-    event.target.value = '';
-  }
-
+}: Props) {
+  const input = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
   return (
     <div
-      className={clsx('sa-drop', className)}
-      data-over={over || undefined}
-      onClick={handleClick}
-      onDragOver={handleDragOver}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
       {...props}
+      data-over={over || undefined}
+      className={clsx('sa-drop min-w-0', className)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        onFiles?.(Array.from(e.dataTransfer.files));
+      }}
     >
+      <input
+        ref={input}
+        type="file"
+        hidden
+        aria-label={inputLabel}
+        accept={accept}
+        multiple={multiple}
+        onChange={(e) => onFiles?.(Array.from(e.target.files ?? []))}
+      />
       {over ? (
         <strong>Drop to upload</strong>
       ) : (
@@ -71,26 +58,20 @@ export function FileUpload({
             <Icon name="upload" size={20} />
           </div>
           <strong>Drag files here</strong> or{' '}
-          <a className="sa-link" href="#">
+          <button
+            type="button"
+            className="sa-link cursor-pointer border-0 bg-transparent p-0 font-[inherit]"
+            onClick={() => input.current?.click()}
+          >
             browse
-          </a>
-          {hint ? (
+          </button>
+          {hint && (
             <div className="sa-hint" style={{ marginTop: 6 }}>
               {hint}
             </div>
-          ) : null}
+          )}
         </>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        className="sa-sr"
-        tabIndex={-1}
-        aria-label="Drag files here or browse"
-        accept={accept}
-        multiple={multiple}
-        onChange={handleChange}
-      />
     </div>
   );
 }

@@ -1,45 +1,32 @@
 'use client';
 
-import * as PopoverPrimitive from '@radix-ui/react-popover';
+import * as P from '@radix-ui/react-popover';
 import clsx from 'clsx';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
-export type PopoverProps = ComponentProps<typeof PopoverPrimitive.Root>;
-export type PopoverTriggerProps = ComponentProps<typeof PopoverPrimitive.Trigger>;
-export type PopoverContentProps = ComponentProps<typeof PopoverPrimitive.Content> & {
-  container?: HTMLElement;
+export type PopoverProps = Omit<ComponentProps<typeof P.Content>, 'title'> & {
+  trigger: ReactNode;
+  title: string;
 };
 
-export const Popover = PopoverPrimitive.Root;
-export const PopoverClose = PopoverPrimitive.Close;
-
-export function PopoverTrigger({ className, ...props }: PopoverTriggerProps) {
+export function Popover({ trigger, title, children, className, ...props }: PopoverProps) {
   return (
-    <PopoverPrimitive.Trigger
-      className={clsx('data-[state=closed]:![animation:none]', className)}
-      {...props}
-    />
-  );
-}
-
-export function PopoverContent({
-  className,
-  sideOffset = 6,
-  align = 'start',
-  container,
-  ...props
-}: PopoverContentProps) {
-  return (
-    <PopoverPrimitive.Portal container={container}>
-      <PopoverPrimitive.Content
-        className={clsx(
-          'sa-popover z-dropdown [--pop-origin:var(--radix-popover-content-transform-origin)]',
-          className,
-        )}
-        sideOffset={sideOffset}
-        align={align}
-        {...props}
-      />
-    </PopoverPrimitive.Portal>
+    <P.Root>
+      <P.Trigger asChild className="data-[state=closed]:![animation:none]">
+        {trigger}
+      </P.Trigger>
+      <P.Portal>
+        <P.Content
+          sideOffset={6}
+          collisionPadding={16}
+          aria-label={title}
+          className={clsx('sa-popover z-toast max-w-[calc(100vw-2rem)]', className)}
+          {...props}
+        >
+          <strong>{title}</strong>
+          {children}
+        </P.Content>
+      </P.Portal>
+    </P.Root>
   );
 }

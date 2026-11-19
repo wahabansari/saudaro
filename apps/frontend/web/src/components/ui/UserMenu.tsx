@@ -1,90 +1,76 @@
 'use client';
 
-import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import * as M from '@radix-ui/react-dropdown-menu';
 import clsx from 'clsx';
 import type { ComponentProps } from 'react';
 import { Icon, type IconName } from '@/icons';
 
-export type UserMenuAction = 'organisation' | 'profile' | 'settings' | 'help' | 'sign-out';
+const ITEM = 'sa-menu__item data-[highlighted]:bg-grey-100 data-[highlighted]:outline-none';
+const LINKS: [IconName, string][] = [
+  ['user', 'Profile'],
+  ['gear', 'Settings'],
+  ['question', 'Help centre'],
+];
 
-export type UserMenuProps = Omit<ComponentProps<'button'>, 'children'> & {
+export type UserMenuProps = ComponentProps<'button'> & {
   name: string;
   email: string;
-  initials: string;
-  open?: boolean;
-  container?: HTMLElement;
-  onAction?: (action: UserMenuAction) => void;
+  onSignOut?: () => void;
 };
 
-type Entry = { action: UserMenuAction; icon: IconName; label: string };
-
-const ITEM = 'sa-menu__item [animation:sa-item-in_340ms_var(--ease-pop)_both]';
-const ENTRIES: Entry[] = [
-  { action: 'organisation', icon: 'building', label: 'Switch organisation' },
-  { action: 'profile', icon: 'user', label: 'Profile' },
-  { action: 'settings', icon: 'gear', label: 'Settings' },
-  { action: 'help', icon: 'question', label: 'Help centre' },
-];
-const SIGN_OUT: Entry = { action: 'sign-out', icon: 'sign-out', label: 'Sign out' };
-
-type ItemProps = { entry: Entry; onAction?: (action: UserMenuAction) => void };
-
-function Item({ entry, onAction }: ItemProps) {
+export function UserMenu({ name, email, onSignOut, className, ...props }: UserMenuProps) {
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
   return (
-    <DropdownMenuPrimitive.Item className={ITEM} onSelect={() => onAction?.(entry.action)}>
-      <Icon name={entry.icon} size={20} />
-      {entry.label}
-      {entry.action === 'organisation' ? (
-        <span className="sa-menu__end">
-          <Icon name="chevron-right" size={20} />
-        </span>
-      ) : null}
-    </DropdownMenuPrimitive.Item>
-  );
-}
-
-export function UserMenu({
-  name,
-  email,
-  initials,
-  open,
-  container,
-  onAction,
-  className,
-  ...props
-}: UserMenuProps) {
-  return (
-    <DropdownMenuPrimitive.Root open={open} modal={!container}>
-      <DropdownMenuPrimitive.Trigger asChild>
-        <button
-          type="button"
-          aria-label={`${initials} Account menu`}
-          {...props}
-          className={clsx('sa-iconbtn rounded-full data-[state=closed]:![animation:none]', className)}
-        >
-          <span className="sa-avatar">{initials}</span>
-        </button>
-      </DropdownMenuPrimitive.Trigger>
-      <DropdownMenuPrimitive.Portal container={container}>
-        <DropdownMenuPrimitive.Content
-          className="sa-menu sa-menu--lg z-dropdown [--pop-origin:var(--radix-dropdown-menu-content-transform-origin)]"
-          sideOffset={6}
+    <M.Root>
+      <M.Trigger
+        className={clsx(
+          'sa-iconbtn !h-10 !w-10 !rounded-full data-[state=closed]:![animation:none]',
+          className,
+        )}
+        aria-label={`Account menu ${initials}`}
+        {...props}
+      >
+        <span className="sa-avatar">{initials}</span>
+      </M.Trigger>
+      <M.Portal>
+        <M.Content
           align="end"
+          sideOffset={6}
+          collisionPadding={16}
+          className="sa-menu sa-menu--lg z-toast max-w-[calc(100vw-2rem)] overflow-y-auto"
         >
           <div className="sa-menu__head" role="presentation">
             <span className="sa-avatar">{initials}</span>
-            <div>
-              <strong>{name}</strong>
-              <span>{email}</span>
+            <div className="min-w-0">
+              <strong className="truncate">{name}</strong>
+              <span className="truncate">{email}</span>
             </div>
           </div>
-          {ENTRIES.map((entry) => (
-            <Item key={entry.action} entry={entry} onAction={onAction} />
+          <M.Item className={ITEM}>
+            <Icon name="building" size={20} />
+            Switch organisation
+            <span className="sa-menu__end">
+              <Icon name="chevron-right" size={20} />
+            </span>
+          </M.Item>
+          {LINKS.map(([icon, label]) => (
+            <M.Item key={label} className={ITEM}>
+              <Icon name={icon} size={20} />
+              {label}
+            </M.Item>
           ))}
-          <DropdownMenuPrimitive.Separator className="sa-menu__sep" />
-          <Item entry={SIGN_OUT} onAction={onAction} />
-        </DropdownMenuPrimitive.Content>
-      </DropdownMenuPrimitive.Portal>
-    </DropdownMenuPrimitive.Root>
+          <M.Separator className="sa-menu__sep" />
+          <M.Item className={ITEM} onSelect={onSignOut}>
+            <Icon name="sign-out" size={20} />
+            Sign out
+          </M.Item>
+        </M.Content>
+      </M.Portal>
+    </M.Root>
   );
 }

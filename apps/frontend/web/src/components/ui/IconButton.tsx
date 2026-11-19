@@ -1,35 +1,25 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef } from 'react';
-import { Icon } from '@/icons';
-import type { IconName } from '@/icons';
 
-export type IconButtonProps = Omit<ComponentPropsWithRef<'button'>, 'children' | 'aria-label'> & {
+type Props = ComponentProps<'button'> & {
   'aria-label': string;
-  icon: IconName;
-  variant?: 'ghost' | 'outline' | 'filled';
-  size?: 'sm' | 'md';
+  variant?: 'ghost' | 'filled';
+  size?: 'md' | 'sm';
 };
 
-export function IconButton({
-  icon,
-  variant = 'ghost',
-  size = 'md',
-  type = 'button',
-  className,
-  ...props
-}: IconButtonProps) {
+export type IconButtonProps = Props;
+
+export function IconButton({ variant = 'ghost', size = 'md', className, ...props }: Props) {
   return (
     <button
-      type={type}
+      type="button"
+      {...props}
       className={clsx(
         'sa-iconbtn',
-        variant !== 'ghost' && `sa-iconbtn--${variant}`,
+        variant === 'filled' && 'sa-iconbtn--filled',
         size === 'sm' && 'sa-iconbtn--sm',
         className,
       )}
-      {...props}
-    >
-      <Icon name={icon} size={20} />
-    </button>
+    />
   );
 }

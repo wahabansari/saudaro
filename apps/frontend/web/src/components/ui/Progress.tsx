@@ -1,36 +1,28 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef } from 'react';
 
-export type ProgressProps = Omit<ComponentPropsWithRef<'div'>, 'children'> & {
+export type ProgressProps = ComponentProps<'div'> & {
+  'aria-label': string;
   value?: number;
 };
 
-const MIN = 0;
-const MAX = 100;
-
 export function Progress({ value, className, ...props }: ProgressProps) {
-  if (value === undefined) {
-    return (
-      <div
-        className={clsx('sa-progress sa-progress--indeterminate', className)}
-        role="progressbar"
-        {...props}
-      >
-        <div className="sa-progress__bar" />
-      </div>
-    );
-  }
-  const clamped = Math.min(MAX, Math.max(MIN, value));
+  const determinate = value !== undefined;
   return (
     <div
-      className={clsx('sa-progress', className)}
       role="progressbar"
-      aria-valuenow={clamped}
-      aria-valuemin={MIN}
-      aria-valuemax={MAX}
+      aria-valuenow={value}
+      aria-valuemin={determinate ? 0 : undefined}
+      aria-valuemax={determinate ? 100 : undefined}
+      className={clsx(
+        'sa-progress',
+        !determinate && 'sa-progress--indeterminate',
+        'w-full min-w-0 max-w-full [contain:paint]',
+        className,
+      )}
       {...props}
     >
-      <div className="sa-progress__bar" style={{ width: `${clamped}%` }} />
+      <div className="sa-progress__bar" style={determinate ? { width: `${value}%` } : undefined} />
     </div>
   );
 }

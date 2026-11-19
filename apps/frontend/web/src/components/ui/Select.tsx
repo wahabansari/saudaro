@@ -1,116 +1,70 @@
 'use client';
 
+import { useId, type ComponentProps } from 'react';
 import * as RadixSelect from '@radix-ui/react-select';
 import clsx from 'clsx';
-import { useId } from 'react';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
 import { Icon } from '@/icons';
 
-export type SelectOption = { value: string; label: string; disabled?: boolean };
+type Props = Omit<ComponentProps<typeof RadixSelect.Root>, 'children'> & {
+  options: string[];
+  label?: string;
+  placeholder?: string;
+  hint?: string;
+  error?: string;
+  id?: string;
+  className?: string;
+};
 
-type RootProps = Pick<
-  RadixSelect.SelectProps,
-  | 'value'
-  | 'defaultValue'
-  | 'onValueChange'
-  | 'open'
-  | 'defaultOpen'
-  | 'onOpenChange'
-  | 'name'
-  | 'disabled'
-  | 'required'
->;
-
-export type SelectProps = Omit<
-  ComponentPropsWithRef<typeof RadixSelect.Trigger>,
-  'children' | keyof RootProps
-> &
-  RootProps & {
-    options: SelectOption[];
-    placeholder?: string;
-    label?: ReactNode;
-    hint?: ReactNode;
-    error?: ReactNode;
-  };
+export type SelectProps = Props;
 
 export function Select({
-  value,
-  defaultValue,
-  onValueChange,
-  open,
-  defaultOpen,
-  onOpenChange,
-  name,
-  disabled,
-  required,
   options,
-  placeholder = 'Select…',
   label,
+  placeholder = 'Select…',
   hint,
   error,
-  id: idProp,
+  id,
   className,
-  'aria-describedby': describedBy,
   ...props
-}: SelectProps) {
-  const autoId = useId();
-  const id = idProp ?? autoId;
-  const messageId = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
-
+}: Props) {
+  const uid = useId();
+  const triggerId = id ?? uid;
+  const noteId = `${triggerId}-note`;
   return (
-    <div className="sa-field">
-      {label ? (
-        <label className="sa-label" htmlFor={id}>
+    <div className="sa-field min-w-0">
+      {label && (
+        <label className="sa-label" htmlFor={triggerId}>
           {label}
-          {required ? (
-            <>
-              {' '}
-              <span className="sa-req" aria-hidden="true">
-                *
-              </span>
-            </>
-          ) : null}
         </label>
-      ) : null}
-      <RadixSelect.Root
-        value={value}
-        defaultValue={defaultValue}
-        onValueChange={onValueChange}
-        open={open}
-        defaultOpen={defaultOpen}
-        onOpenChange={onOpenChange}
-        name={name}
-        disabled={disabled}
-        required={required}
-      >
+      )}
+      <RadixSelect.Root {...props}>
         <RadixSelect.Trigger
-          id={id}
-          className={clsx('sa-select text-left data-[state=closed]:![animation:none]', className)}
-          aria-required={required || undefined}
+          id={triggerId}
           aria-invalid={error ? true : undefined}
-          aria-describedby={clsx(describedBy, messageId) || undefined}
-          {...props}
+          aria-describedby={error || hint ? noteId : undefined}
+          className={clsx(
+            'sa-select min-w-0 text-left data-[placeholder]:text-grey-500 data-[state=closed]:![animation:none]',
+            className,
+          )}
         >
-          <RadixSelect.Value placeholder={<span className="sa-combo__ph">{placeholder}</span>} />
+          <RadixSelect.Value placeholder={placeholder} />
         </RadixSelect.Trigger>
         <RadixSelect.Portal>
           <RadixSelect.Content
-            className="sa-menu z-dropdown"
             position="popper"
             sideOffset={6}
-            style={{ minWidth: 'var(--radix-select-trigger-width)' }}
+            className="sa-menu z-dropdown !min-w-[var(--radix-select-trigger-width)]"
           >
             <RadixSelect.Viewport>
               {options.map((option) => (
                 <RadixSelect.Item
-                  key={option.value}
-                  value={option.value}
-                  disabled={option.disabled}
-                  className="sa-menu__item"
+                  key={option}
+                  value={option}
+                  className="sa-menu__item outline-none data-[highlighted]:bg-grey-100"
                 >
-                  <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
+                  <RadixSelect.ItemText>{option}</RadixSelect.ItemText>
                   <RadixSelect.ItemIndicator className="sa-menu__end">
-                    <Icon name="check" size={16} className="text-action" />
+                    <Icon name="check" size={16} />
                   </RadixSelect.ItemIndicator>
                 </RadixSelect.Item>
               ))}
@@ -119,15 +73,17 @@ export function Select({
         </RadixSelect.Portal>
       </RadixSelect.Root>
       {error ? (
-        <span id={messageId} className="sa-error">
+        <span id={noteId} className="sa-error">
           <Icon name="alert" size={14} />
           {error}
         </span>
-      ) : hint ? (
-        <span id={messageId} className="sa-hint">
-          {hint}
-        </span>
-      ) : null}
+      ) : (
+        hint && (
+          <span id={noteId} className="sa-hint">
+            {hint}
+          </span>
+        )
+      )}
     </div>
   );
 }

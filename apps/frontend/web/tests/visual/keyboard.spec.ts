@@ -5,16 +5,23 @@ const note = (name: string, text: string) => record('keyboard.json', 'results', 
 const wrapper = (page: Page, name: string) => page.locator(`[data-ds-component="${name}"]`).first();
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/design-system', { waitUntil: 'networkidle' });
+  await page.goto('/', { waitUntil: 'networkidle' });
 });
 
-test('Dialog: gallery frame is static, focus trap not testable', async ({ page }) => {
-  const frame = wrapper(page, 'Dialog');
-  const triggers = await frame.locator('button[aria-haspopup="dialog"], [data-testid="open-dialog"]').count();
-  const modal = await frame.locator('[role="dialog"]').getAttribute('aria-modal');
-  const text = `NOT TESTED: gallery renders Dialog open and non-modal (aria-modal=${modal}, ${triggers} triggers), so focus trap, Esc-closes and focus-return cannot be exercised.`;
-  note('Dialog', text);
-  test.skip(true, text);
+test('Dialog: Enter opens, focus stays trapped, Esc closes and returns focus', async ({ page }) => {
+  const trigger = wrapper(page, 'Dialog').locator('button').first();
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('Tab');
+    expect(await dialog.evaluate((d) => d.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  note('Dialog', 'PASS');
 });
 
 test('Menu: Enter opens, arrows move, Esc closes and returns focus', async ({ page }) => {

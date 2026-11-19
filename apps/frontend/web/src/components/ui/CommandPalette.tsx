@@ -1,150 +1,100 @@
 'use client';
 
-import * as DialogPrimitive from '@radix-ui/react-dialog';
+import * as D from '@radix-ui/react-dialog';
 import { Command } from 'cmdk';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from '@/icons';
-import { Highlight } from './Highlight';
 
-export type CommandPaletteItem = {
-  label: string;
-  icon: IconName;
-  shortcut?: string[];
-  onSelect?: () => void;
-};
+export type CommandItem = { label: string; icon: IconName; keys?: string[]; onSelect?: () => void };
+export type CommandGroup = { heading: string; items: CommandItem[] };
+export type CommandPaletteProps = { groups: CommandGroup[]; trigger?: ReactNode };
 
-export type CommandPaletteGroup = { heading: string; items: CommandPaletteItem[] };
+const ITEM = 'sa-menu__item data-[selected=true]:bg-grey-100';
+const HINTS: [string[], string][] = [
+  [['↑', '↓'], 'Navigate'],
+  [['↵'], 'Open'],
+  [['Esc'], 'Close'],
+];
 
-export type CommandPaletteProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  groups: CommandPaletteGroup[];
-  placeholder: string;
-  emptyLabel?: string;
-  container?: HTMLElement;
-  defaultValue?: string;
-};
+export function CommandPalette({ groups, trigger }: CommandPaletteProps) {
+  const [open, setOpen] = useState(false);
 
-const ITEM =
-  'sa-menu__item data-[selected=true]:bg-grey-100 [animation:sa-item-in_340ms_var(--ease-pop)_both]';
-
-type BodyProps = Pick<
-  CommandPaletteProps,
-  'groups' | 'placeholder' | 'emptyLabel' | 'onOpenChange' | 'defaultValue'
->;
-
-function PaletteBody({ groups, placeholder, emptyLabel, onOpenChange, defaultValue }: BodyProps) {
-  const [search, setSearch] = useState('');
-
-  return (
-    <Command label="Command palette" defaultValue={defaultValue}>
-      <div className="sa-cmd__in">
-        <Icon name="search" size={20} />
-        <Command.Input
-          placeholder={placeholder}
-          aria-label="Search commands"
-          value={search}
-          onValueChange={setSearch}
-        />
-        <span className="sa-kbd">Esc</span>
-      </div>
-      <Command.List className="sa-cmd__list">
-        <Command.Empty className="sa-combo__empty">{`${emptyLabel} "${search}"`}</Command.Empty>
-        {groups.map((group) => (
-          <Command.Group key={group.heading}>
-            <div className="sa-menu__label" role="presentation">
-              {group.heading}
-            </div>
-            {group.items.map((item) => (
-              <Command.Item
-                key={item.label}
-                value={item.label}
-                className={ITEM}
-                onSelect={() => {
-                  item.onSelect?.();
-                  onOpenChange(false);
-                }}
-              >
-                <Icon name={item.icon} size={20} />
-                <Highlight text={item.label} query={search} />
-                {item.shortcut ? (
-                  <span className="sa-menu__end">
-                    {item.shortcut.map((key) => (
-                      <kbd key={key} className="sa-kbd">
-                        {key}
-                      </kbd>
-                    ))}
-                  </span>
-                ) : null}
-              </Command.Item>
-            ))}
-          </Command.Group>
-        ))}
-      </Command.List>
-      <div className="sa-cmd__foot">
-        <span>
-          <kbd className="sa-kbd">↑</kbd>
-          <kbd className="sa-kbd">↓</kbd>Navigate
-        </span>
-        <span>
-          <kbd className="sa-kbd">↵</kbd>Open
-        </span>
-        <span>
-          <kbd className="sa-kbd">Esc</kbd>Close
-        </span>
-      </div>
-    </Command>
-  );
-}
-
-export function CommandPalette({
-  open,
-  onOpenChange,
-  groups,
-  placeholder,
-  emptyLabel = 'No results for',
-  container,
-  defaultValue,
-}: CommandPaletteProps) {
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) return;
-      event.preventDefault();
-      onOpenChange(!open);
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onOpenChange]);
-
-  const content = (
-    <DialogPrimitive.Content
-      className="sa-cmd"
-      aria-label="Command palette"
-      aria-describedby={undefined}
-      onOpenAutoFocus={container ? (event) => event.preventDefault() : undefined}
-    >
-      <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
-      <PaletteBody
-        defaultValue={defaultValue}
-        groups={groups}
-        placeholder={placeholder}
-        emptyLabel={emptyLabel}
-        onOpenChange={onOpenChange}
-      />
-    </DialogPrimitive.Content>
-  );
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((o) => !o);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={!container}>
-      <DialogPrimitive.Portal container={container}>
-        {container ? (
-          content
-        ) : (
-          <DialogPrimitive.Overlay className="sa-scrim fixed inset-0 z-modal items-start pt-16">
-            {content}
-          </DialogPrimitive.Overlay>
-        )}
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+    <D.Root open={open} onOpenChange={setOpen}>
+      {trigger && (
+        <D.Trigger asChild className="data-[state=closed]:![animation:none]">
+          {trigger}
+        </D.Trigger>
+      )}
+      <D.Portal>
+        <D.Overlay className="sa-scrim fixed inset-0 z-modal !place-items-start">
+          <D.Content className="sa-cmd @container mx-auto mt-10" aria-describedby={undefined}>
+            <D.Title className="sr-only">Command palette</D.Title>
+            <Command label="Command palette" loop>
+              <div className="sa-cmd__in">
+                <Icon name="search" size={20} />
+                <Command.Input placeholder="Search or jump to…" aria-label="Search commands" />
+                <span className="sa-kbd">Esc</span>
+              </div>
+              <Command.List className="sa-cmd__list">
+                <Command.Empty className="sa-combo__empty">No results</Command.Empty>
+                {groups.map((g) => (
+                  <Command.Group
+                    key={g.heading}
+                    heading={<span className="sa-menu__label block">{g.heading}</span>}
+                  >
+                    {g.items.map((item) => (
+                      <Command.Item
+                        key={item.label}
+                        className={ITEM}
+                        onSelect={() => {
+                          item.onSelect?.();
+                          setOpen(false);
+                        }}
+                      >
+                        <Icon name={item.icon} size={20} />
+                        {item.label}
+                        {item.keys && (
+                          <span className="sa-menu__end !hidden @sm:!flex">
+                            {item.keys.map((k) => (
+                              <kbd key={k} className="sa-kbd">
+                                {k}
+                              </kbd>
+                            ))}
+                          </span>
+                        )}
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                ))}
+              </Command.List>
+            </Command>
+            <div className="sa-cmd__foot flex-wrap">
+              {HINTS.map(([keys, text]) => (
+                <span key={text}>
+                  {keys.map((k) => (
+                    <kbd key={k} className="sa-kbd">
+                      {k}
+                    </kbd>
+                  ))}
+                  {text}
+                </span>
+              ))}
+            </div>
+          </D.Content>
+        </D.Overlay>
+      </D.Portal>
+    </D.Root>
   );
 }

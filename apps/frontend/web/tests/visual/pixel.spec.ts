@@ -9,6 +9,12 @@ import { COMPONENTS_DIR, OUT, WEB, components, writeJson } from './helpers';
 const WIDTHS = [1440, 375];
 const PADDING = 20;
 const SETTLE: Record<string, number> = { PageLoader: 800 }; // appears after a 300 ms delay
+// The kit previews show these already open; the page shows the trigger that opens the real overlay.
+const INTERACTIVE = new Set([
+  'Dialog', 'Sheet', 'Popover', 'Tooltip', 'Menu', 'UserMenu', 'Combobox', 'MultiSelect',
+  'CommandPalette', 'DatePicker', 'FilterDropdown', 'GridMenus',
+]);
+const NOT_A_COMPONENT = new Set(['Placeholder']); // only composes Avatar and a card media block
 const STYLES = ['saudaro-tokens.css', 'saudaro-bundle.css'].map((f) =>
   pathToFileURL(path.join(WEB, 'src/styles', f)).href,
 );
@@ -61,7 +67,7 @@ for (const width of WIDTHS) {
     const ctx = await browser.newContext({ viewport: { width, height: 900 } });
     const gallery = await ctx.newPage();
     const preview = await ctx.newPage();
-    await gallery.goto('/design-system', { waitUntil: 'networkidle' });
+    await gallery.goto('/', { waitUntil: 'networkidle' });
     await gallery.addStyleTag({ content: FREEZE });
     await settle(gallery, 800);
 
@@ -69,6 +75,13 @@ for (const width of WIDTHS) {
     fs.mkdirSync(dir, { recursive: true });
     const results: Record<string, unknown> = {};
     for (const name of components) {
+      if (INTERACTIVE.has(name) || NOT_A_COMPONENT.has(name)) {
+        results[name] = {
+          status: 'N/A',
+          reason: INTERACTIVE.has(name) ? 'opens from a trigger (keyboard test)' : 'not a separate component',
+        };
+        continue;
+      }
       const target = gallery.locator(`[data-ds-component="${name}"]`);
       const count = await target.count();
       if (count === 0) {
@@ -89,7 +102,7 @@ for (const width of WIDTHS) {
     }
     writeJson(`pixel-${width}.json`, results);
     await ctx.close();
-    const bad = Object.entries(results).filter(([, r]) => (r as { status: string }).status !== 'PASS');
+    const bad = Object.entries(results).filter(([, r]) => !['PASS', 'N/A'].includes((r as { status: string }).status));
     expect.soft(bad.map(([n]) => n), 'components that differ or are missing').toEqual([]);
   });
 }

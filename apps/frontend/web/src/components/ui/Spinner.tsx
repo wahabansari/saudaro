@@ -1,17 +1,10 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef } from 'react';
 
-export type SpinnerProps = ComponentPropsWithRef<'span'> & {
-  size?: 'md' | 'lg';
-};
+export type SpinnerProps = ComponentProps<'span'> & { large?: boolean };
 
-export function Spinner({ size = 'md', className, ...props }: SpinnerProps) {
+export function Spinner({ large, className, ...props }: SpinnerProps) {
   return (
-    <span
-      className={clsx('sa-spinner', size === 'lg' && 'sa-spinner--lg', className)}
-      role="status"
-      aria-label="Loading"
-      {...props}
-    />
+    <span role="status" className={clsx('sa-spinner', large && 'sa-spinner--lg', className)} {...props} />
   );
 }

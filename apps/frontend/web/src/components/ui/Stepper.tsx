@@ -2,27 +2,26 @@ import clsx from 'clsx';
 import type { ComponentProps } from 'react';
 import { Icon } from '@/icons';
 
-export type StepperProps = ComponentProps<'ol'> & {
+export type StepperProps = ComponentProps<'div'> & {
   steps: string[];
   current: number;
 };
 
 export function Stepper({ steps, current, className, ...props }: StepperProps) {
   return (
-    <ol className={clsx('sa-steps', className)} {...props}>
-      {steps.map((label, index) => {
-        const done = index < current;
-        return (
+    <div className={clsx('@container', className)} {...props}>
+      <ol className="sa-steps @max-md:flex-wrap @max-md:gap-y-3">
+        {steps.map((label, i) => (
           <li
             key={label}
-            className={clsx('sa-step', done && 'sa-step--done')}
-            aria-current={index === current ? 'step' : undefined}
+            className={clsx('sa-step', i < current && 'sa-step--done')}
+            aria-current={i === current ? 'step' : undefined}
           >
-            <span className="sa-step__n">{done ? <Icon name="check" size={20} /> : index + 1}</span>
+            <span className="sa-step__n">{i < current ? <Icon name="check" /> : i + 1}</span>
             {label}
           </li>
-        );
-      })}
-    </ol>
+        ))}
+      </ol>
+    </div>
   );
 }

@@ -1,13 +1,13 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef, ReactNode } from 'react';
 
-export type SwitchProps = Omit<ComponentPropsWithRef<'input'>, 'type' | 'role' | 'children'> & {
-  label: ReactNode;
-};
+type Props = Omit<ComponentProps<'input'>, 'type'> & { label?: React.ReactNode };
 
-export function Switch({ label, className, ...props }: SwitchProps) {
+export type SwitchProps = Props;
+
+export function Switch({ label, className, ...props }: Props) {
   return (
-    <label className={clsx('sa-switch', className)}>
+    <label className={clsx('sa-switch max-w-full', className)}>
       <input type="checkbox" role="switch" {...props} />
       <span className="sa-switch__track" />
       {label}

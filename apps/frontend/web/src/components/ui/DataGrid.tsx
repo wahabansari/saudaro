@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import {
+  flexRender,
   getCoreRowModel,
   getFacetedMinMaxValues,
   getFacetedRowModel,
@@ -10,338 +11,285 @@ import {
   getPaginationRowModel,
   useReactTable,
   type Column,
-  type ColumnPinningState,
-  type RowData,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type FilterFn,
   type RowSelectionState,
   type VisibilityState,
 } from '@tanstack/react-table';
 import clsx from 'clsx';
-import { Icon } from '@/icons';
-import { GridRow } from './DataGrid.row';
-import { columnLabel, GridHeaderCell } from './DataGrid.header';
-import { describeFilter, filterFnFor, formatCellValue } from './DataGrid.filters';
-import { isReferenceColumn } from './DataGrid.layout';
-import { GridBulkBar, GridChips, GridFooter, GridToolbar, type GridChip } from './DataGrid.parts';
-import type { GridColumnDef, GridDensity, GridFilters, GridFilterValue } from './DataGrid.types';
-import { ColumnPicker, type GridRowAction } from './GridMenus';
-import { GridEmpty, GridSkeletonRows, type GridEmptyProps } from './GridStates';
+import { describeFilter, filterFns, type FilterValue, type GridFilters } from './dataGridFilters';
+import { FilterDropdown } from './FilterDropdown';
+import { ColumnPicker, RowActionsMenu, type RowAction } from './GridMenus';
+import { BAR_WRAP, Check, DensityButton, GridBulk, GridChips, GridFooter, SearchField } from './GridParts';
+import { GridEmpty, GridSkeleton } from './GridStates';
 
-export type DataGridProps<TData extends RowData> = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
+export type { ColumnDef } from '@tanstack/react-table';
+
+export type DataGridProps<T> = {
   title: string;
-  columns: GridColumnDef<TData>[];
-  data: TData[];
-  getRowId: (row: TData) => string;
-  /** Active column filters; mirror them in the URL search params. */
-  filters: GridFilters;
-  onFiltersChange: (filters: GridFilters) => void;
-  search: string;
-  onSearchChange: (search: string) => void;
-  /** 1-based page number. */
-  page: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
-  pageSizeOptions?: readonly number[];
-  /** Server-side mode: `data` is already filtered and paged, `rowCount` is the total match count. */
-  rowCount?: number;
-  isLoading?: boolean;
-  /** Actions of the row menu; the first is the default action, danger ones go last. */
-  rowActions?: (row: TData) => GridRowAction[];
-  /** Actions shown in the bulk bar for the selected rows. */
-  bulkActions?: (rows: TData[]) => ReactNode;
-  /** Extra toolbar buttons, such as Export and the primary action. */
-  toolbarActions?: ReactNode;
-  searchPlaceholder?: string;
-  /** Shown when filters or search leave no rows. */
-  noResults: Pick<GridEmptyProps, 'title' | 'description'>;
-  /** Shown when there are no rows and nothing is filtered. */
-  firstUse?: GridEmptyProps;
-  /** Height limit of the scroll area, e.g. `440px`. */
-  maxHeight?: string;
-  defaultDensity?: GridDensity;
-  /** Selected row ids on first render. */
-  defaultRowSelection?: RowSelectionState;
-  /** Column id whose filter popover is open; set it (with `onOpenFilterChange`) to control the popover. */
-  openFilterId?: string | null;
-  onOpenFilterChange?: (columnId: string | null) => void;
-  /** Portal target of the filter popovers, for rendering them inside a wrapper. */
-  portalContainer?: HTMLElement | null;
+  columns: ColumnDef<T>[];
+  data: T[];
+  searchPlaceholder: string;
+  empty: { title: string; description: string };
+  getRowId?: (row: T) => string;
+  filters?: GridFilters;
+  onFiltersChange?: (filters: GridFilters) => void;
+  actions?: ReactNode;
+  bulkActions?: (rows: T[]) => ReactNode;
+  rowActions?: (row: T) => RowAction[];
+  defaultSelected?: string[];
+  loading?: boolean;
+  height?: number;
+  className?: string;
 };
 
-const DEFAULT_PAGE_SIZES = [10, 25, 50, 100] as const;
-const DENSITY_LABEL: Record<GridDensity, string> = { compact: 'Compact', comfortable: 'Comfortable' };
-const OTHER_DENSITY: Record<GridDensity, GridDensity> = { compact: 'comfortable', comfortable: 'compact' };
+const DENSITIES = ['Default', 'Comfortable', 'Compact'] as const;
+const DENSITY_CLASS = { Default: '', Comfortable: 'sa-grid--comfy', Compact: 'sa-grid--compact' };
 
-const columnIdOf = <TData extends RowData>(column: GridColumnDef<TData>) =>
-  column.id ?? ('accessorKey' in column ? String(column.accessorKey) : '');
+const cellClass = <T,>(column: Column<T>) =>
+  clsx(
+    column.columnDef.meta?.sticky === 'left' && 'st1 ref',
+    column.columnDef.meta?.sticky === 'right' && 'stR',
+    column.columnDef.meta?.align === 'right' && 'num',
+  );
 
-function initialPinning<TData extends RowData>(columns: GridColumnDef<TData>[]): ColumnPinningState {
-  const idsFor = (side: 'left' | 'right') =>
-    columns.filter((column) => column.meta?.sticky === side).map(columnIdOf);
-  return { left: idsFor('left'), right: idsFor('right') };
-}
-
-export function DataGrid<TData extends RowData>({
+export function DataGrid<T>({
   title,
   columns,
   data,
-  getRowId,
-  filters,
-  onFiltersChange,
-  search,
-  onSearchChange,
-  page,
-  pageSize,
-  onPageChange,
-  onPageSizeChange,
-  pageSizeOptions = DEFAULT_PAGE_SIZES,
-  rowCount,
-  isLoading = false,
-  rowActions,
-  bulkActions,
-  toolbarActions,
   searchPlaceholder,
-  noResults,
-  firstUse,
-  maxHeight,
-  defaultDensity = 'comfortable',
-  defaultRowSelection = {},
-  openFilterId,
-  onOpenFilterChange,
-  portalContainer,
+  empty,
+  getRowId,
+  filters: controlledFilters,
+  onFiltersChange,
+  actions,
+  bulkActions,
+  rowActions,
+  defaultSelected = [],
+  loading,
+  height = 440,
   className,
-  style,
-  ...rest
-}: DataGridProps<TData>) {
-  const isServerSide = rowCount !== undefined;
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>(defaultRowSelection);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>(() => initialPinning(columns));
-  const [density, setDensity] = useState(defaultDensity);
-  const [menuColumnId, setMenuColumnId] = useState<string | null>(null);
-  const [innerFilterId, setInnerFilterId] = useState<string | null>(null);
-  const filterColumnId = openFilterId === undefined ? innerFilterId : openFilterId;
-  const setFilterColumnId = onOpenFilterChange ?? setInnerFilterId;
+}: DataGridProps<T>) {
+  const [ownFilters, setOwnFilters] = useState<GridFilters>([]);
+  const [search, setSearch] = useState('');
+  const [selection, setSelection] = useState<RowSelectionState>(() =>
+    Object.fromEntries(defaultSelected.map((id) => [id, true])),
+  );
+  const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [density, setDensity] = useState(0);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
-  const tableColumns = useMemo(
-    () =>
-      columns.map((column): GridColumnDef<TData> => ({
-        ...column,
-        cell: column.cell ?? ((info) => formatCellValue(info.getValue(), info.column.columnDef.meta?.filter)),
-        filterFn: column.meta?.filter ? filterFnFor<TData>(column.meta.filter) : undefined,
-      })),
+  const filters = controlledFilters ?? ownFilters;
+  const setFilters = onFiltersChange ?? setOwnFilters;
+  const gridColumns = useMemo(
+    () => columns.map((c) => ({ ...c, filterFn: filterFns[c.meta?.filter ?? 'text'] as FilterFn<T> })),
     [columns],
   );
 
   const table = useReactTable({
     data,
-    columns: tableColumns,
+    columns: gridColumns,
     getRowId,
     state: {
-      columnFilters: Object.entries(filters).map(([id, value]) => ({ id, value })),
+      columnFilters: filters as ColumnFiltersState,
       globalFilter: search,
-      rowSelection,
-      columnVisibility,
-      columnPinning,
-      pagination: { pageIndex: page - 1, pageSize },
+      rowSelection: selection,
+      columnVisibility: visibility,
+      pagination,
     },
-    onRowSelectionChange: setRowSelection,
-    onColumnVisibilityChange: setColumnVisibility,
-    onColumnPinningChange: setColumnPinning,
-    globalFilterFn: 'includesString',
-    manualFiltering: isServerSide,
-    manualPagination: isServerSide,
-    rowCount,
-    autoResetPageIndex: false,
+    onGlobalFilterChange: setSearch,
+    onRowSelectionChange: setSelection,
+    onColumnVisibilityChange: setVisibility,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
-  const rows = table.getRowModel().rows;
-  const total = rowCount ?? table.getPrePaginationRowModel().rows.length;
-  const hasActions = rowActions !== undefined;
-  const visibleColumns: Column<TData, unknown>[] = [
-    ...table.getLeftVisibleLeafColumns(),
-    ...table.getCenterVisibleLeafColumns(),
-    ...table.getRightVisibleLeafColumns(),
-  ];
-  const allColumns = table.getAllLeafColumns();
-  const referenceColumn = allColumns.find(isReferenceColumn);
-  const selectedRows = table.getSelectedRowModel().rows;
-
-  const setFilter = (columnId: string, value: GridFilterValue | undefined) => {
-    const { [columnId]: _previous, ...others } = filters;
-    onFiltersChange(value ? { ...others, [columnId]: value } : others);
-    onPageChange(1);
-  };
-  const changeSearch = (next: string) => {
-    onSearchChange(next);
-    onPageChange(1);
-  };
+  const setFilter = (id: string, value?: FilterValue) =>
+    setFilters([...filters.filter((f) => f.id !== id), ...(value ? [{ id, value }] : [])]);
   const clearAll = () => {
-    onFiltersChange({});
-    onSearchChange('');
-    onPageChange(1);
+    setFilters([]);
+    setSearch('');
   };
+  const labelOf = (id: string) => String(table.getColumn(id)?.columnDef.header);
 
-  const chips: GridChip[] = [
-    ...(search
-      ? [{ id: 'search', label: 'Search', text: `Search: ${search}`, onRemove: () => changeSearch('') }]
-      : []),
-    ...Object.entries(filters).flatMap(([id, filter]) => {
-      const column = table.getColumn(id);
-      return column
-        ? [
-            {
-              id,
-              label: columnLabel(column),
-              text: describeFilter(columnLabel(column), filter),
-              onRemove: () => setFilter(id, undefined),
-            },
-          ]
-        : [];
-    }),
-  ];
-
-  const rowLabel = (rowId: string, value: unknown) => (value === undefined ? rowId : String(value));
-  const isEmpty = !isLoading && rows.length === 0;
-  const emptyContent = !chips.length && firstUse ? firstUse : { ...noResults, action: undefined };
+  const leaves = table.getAllLeafColumns();
+  const refId = (leaves.find((c) => c.columnDef.meta?.sticky === 'left') ?? leaves[0])?.id ?? '';
+  const rows = table.getRowModel().rows;
+  const total = table.getFilteredRowModel().rows.length;
+  const { pageIndex, pageSize } = pagination;
+  const selectedCount = Object.keys(selection).length;
+  const isEmpty = !loading && rows.length === 0;
+  const nextDensity = (density + 1) % DENSITIES.length;
+  const clearSelection = () => table.resetRowSelection();
 
   return (
-    <div
-      className={clsx('sa-grid', density === 'compact' && 'sa-grid--compact', className)}
-      style={{ ...style, ...(maxHeight ? ({ '--grid-h': maxHeight } as CSSProperties) : null) }}
-      {...rest}
-    >
-      {selectedRows.length > 0 ? (
-        <GridBulkBar count={selectedRows.length} onClear={() => table.resetRowSelection()}>
-          {bulkActions?.(selectedRows.map((row) => row.original))}
-        </GridBulkBar>
-      ) : (
-        <GridToolbar
-          title={title}
-          total={total}
-          search={search}
-          onSearchChange={changeSearch}
-          searchPlaceholder={searchPlaceholder}
-        >
-          <ColumnPicker
-            columns={allColumns.map((column) => ({
-              id: column.id,
-              label: columnLabel(column),
-              isVisible: column.getIsVisible(),
-              isLocked: isReferenceColumn(column),
-            }))}
-            onToggle={(id, isVisible) => table.getColumn(id)?.toggleVisibility(isVisible)}
-            onReset={() => {
-              table.resetColumnVisibility();
-              table.setColumnPinning(initialPinning(columns));
-            }}
-          />
-          <button
-            type="button"
-            className="sa-btn sa-btn--secondary sa-btn--sm"
-            onClick={() => setDensity(OTHER_DENSITY[density])}
-          >
-            <Icon name="rows" />
-            {DENSITY_LABEL[density]}
-          </button>
-          {toolbarActions}
-        </GridToolbar>
-      )}
-      {chips.length > 0 ? <GridChips chips={chips} onClearAll={clearAll} /> : null}
-      <div className="sa-grid__body">
-        <div
-          className={clsx('sa-grid__scroll', isEmpty && 'sa-grid__scroll--empty')}
-          tabIndex={0}
-          role="region"
-          aria-label={`${title} table, scrollable`}
-          aria-busy={isLoading || undefined}
-        >
-          <table className="sa-gt">
-            <thead>
-              <tr>
-                <th className="cb" scope="col">
-                  <label className="sa-check" aria-label="Select all rows">
-                    <input
-                      type="checkbox"
-                      checked={table.getIsAllPageRowsSelected()}
-                      onChange={(event) => table.toggleAllPageRowsSelected(event.target.checked)}
-                    />
-                    <span className="sa-check__box">
-                      <Icon name="check" />
-                    </span>
-                  </label>
-                </th>
-                {visibleColumns.map((column) => (
-                  <GridHeaderCell
-                    key={column.id}
-                    column={column}
-                    hasActions={hasActions}
-                    filter={filters[column.id]}
-                    onApplyFilter={setFilter}
-                    isMenuOpen={menuColumnId === column.id}
-                    onMenuOpenChange={(open) => setMenuColumnId(open ? column.id : null)}
-                    isFilterOpen={filterColumnId === column.id}
-                    onFilterOpenChange={(open) => setFilterColumnId(open ? column.id : null)}
-                    portalContainer={portalContainer}
-                  />
-                ))}
-                {hasActions ? (
-                  <th className="stR" scope="col">
-                    <span className="sa-sr">Actions</span>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            {isEmpty ? null : (
-              <tbody>
-                {isLoading ? (
-                  <GridSkeletonRows columns={visibleColumns} hasActions={hasActions} />
-                ) : (
-                  rows.map((row) => (
-                    <GridRow
-                      key={row.id}
-                      row={row}
-                      label={rowLabel(row.id, referenceColumn && row.getValue(referenceColumn.id))}
-                      hasActions={hasActions}
-                      actions={rowActions?.(row.original)}
-                    />
-                  ))
-                )}
-              </tbody>
-            )}
-          </table>
-          {isEmpty ? (
-            <GridEmpty
-              {...emptyContent}
-              action={
-                emptyContent.action ?? (
-                  <button type="button" className="sa-btn sa-btn--secondary sa-btn--sm" onClick={clearAll}>
-                    Clear all filters
-                  </button>
-                )
-              }
+    <div className="@container min-w-0">
+      <div
+        className={clsx('sa-grid', DENSITY_CLASS[DENSITIES[density] ?? 'Default'], className)}
+        style={{ '--grid-h': `${height}px` } as CSSProperties}
+      >
+        {selectedCount > 0 ? (
+          <GridBulk count={selectedCount} onClear={clearSelection}>
+            {bulkActions?.(table.getSelectedRowModel().flatRows.map((r) => r.original))}
+          </GridBulk>
+        ) : (
+          <div className={clsx('sa-grid__bar', BAR_WRAP)}>
+            <h3>{title}</h3>
+            <span className="sa-badge sa-badge--neutral">{data.length}</span>
+            <SearchField
+              className="order-last basis-full @3xl:order-none @3xl:basis-auto"
+              label={`Search ${title}`}
+              placeholder={searchPlaceholder}
+              clearLabel="Clear"
+              value={search}
+              onChange={setSearch}
             />
-          ) : null}
+            <span className="sa-grow" />
+            <ColumnPicker
+              columns={leaves.map((c) => ({
+                id: c.id,
+                label: labelOf(c.id),
+                visible: c.getIsVisible(),
+                locked: c.id === refId,
+              }))}
+              onToggle={(id) => table.getColumn(id)?.toggleVisibility()}
+              onReset={() => table.resetColumnVisibility()}
+            />
+            <DensityButton label={DENSITIES[nextDensity] ?? ''} onClick={() => setDensity(nextDensity)} />
+            {actions}
+          </div>
+        )}
+        {filters.length > 0 && (
+          <GridChips
+            chips={filters.map(({ id, value }) => ({ id, label: labelOf(id), text: describeFilter(value) }))}
+            onRemove={setFilter}
+            onClear={clearAll}
+          />
+        )}
+        <div className="sa-grid__body">
+          <div
+            className={clsx('sa-grid__scroll', isEmpty && 'sa-grid__scroll--empty')}
+            tabIndex={0}
+            role="region"
+            aria-label={`${title} table, scrollable`}
+            aria-busy={loading || undefined}
+          >
+            <table className="sa-gt">
+              <thead>
+                <tr>
+                  <th className="cb" scope="col">
+                    <Check
+                      label="Select all rows"
+                      checked={table.getIsAllPageRowsSelected()}
+                      onChange={table.getToggleAllPageRowsSelectedHandler()}
+                    />
+                  </th>
+                  {table.getVisibleLeafColumns().map((column) => {
+                    const kind = column.columnDef.meta?.filter ?? 'text';
+                    const label = labelOf(column.id);
+                    return (
+                      <th
+                        key={column.id}
+                        scope="col"
+                        className={cellClass(column)}
+                        style={{ width: column.getSize(), minWidth: column.getSize() }}
+                      >
+                        <div className="sa-th">
+                          <span className="sa-th__label">{label}</span>
+                          <FilterDropdown
+                            label={label}
+                            kind={kind}
+                            value={filters.find((f) => f.id === column.id)?.value}
+                            onChange={(value) => setFilter(column.id, value)}
+                            options={
+                              kind === 'enum'
+                                ? [...column.getFacetedUniqueValues()].map(([value, count]) => ({
+                                    value: String(value),
+                                    count,
+                                  }))
+                                : undefined
+                            }
+                            range={kind === 'number' ? column.getFacetedMinMaxValues() : undefined}
+                          />
+                        </div>
+                      </th>
+                    );
+                  })}
+                  {rowActions && (
+                    <th className="stR" scope="col">
+                      <span className="sa-sr">Actions</span>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              {loading ? (
+                <GridSkeleton
+                  columns={table.getVisibleLeafColumns().map((c) => ({ ...c.columnDef.meta }))}
+                  withActions={!!rowActions}
+                />
+              ) : (
+                <tbody>
+                  {rows.map((row) => {
+                    const label = String(row.getValue(refId));
+                    return (
+                      <tr key={row.id} aria-selected={row.getIsSelected() || undefined}>
+                        <td className="cb">
+                          <Check
+                            label={`Select ${label}`}
+                            checked={row.getIsSelected()}
+                            onChange={row.getToggleSelectedHandler()}
+                          />
+                        </td>
+                        {row.getVisibleCells().map((cell) => {
+                          const value = cell.getValue();
+                          return (
+                            <td
+                              key={cell.id}
+                              className={cellClass(cell.column)}
+                              title={typeof value === 'string' ? value : undefined}
+                            >
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </td>
+                          );
+                        })}
+                        {rowActions && (
+                          <td className="stR">
+                            <RowActionsMenu
+                              label={`Row actions for ${label}`}
+                              actions={rowActions(row.original)}
+                            />
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              )}
+            </table>
+            {isEmpty && (
+              <GridEmpty
+                title={empty.title}
+                description={empty.description}
+                onClear={filters.length > 0 || search ? clearAll : undefined}
+              />
+            )}
+          </div>
         </div>
+        <GridFooter
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          pageCount={table.getPageCount()}
+          total={total}
+          onPageSize={table.setPageSize}
+          onPage={table.setPageIndex}
+        />
       </div>
-      <GridFooter
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        count={rows.length}
-        pageSizeOptions={pageSizeOptions}
-        onPageChange={onPageChange}
-        onPageSizeChange={(size) => {
-          onPageSizeChange(size);
-          onPageChange(1);
-        }}
-      />
     </div>
   );
 }

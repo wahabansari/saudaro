@@ -1,26 +1,20 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef } from 'react';
 
-export type AvatarProps = ComponentPropsWithRef<'span'> & {
-  size?: 'sm' | 'md' | 'lg';
-  shape?: 'circle' | 'square';
-  variant?: 'soft' | 'solid';
+export type AvatarProps = ComponentProps<'span'> & {
+  size?: 'sm' | 'lg';
+  square?: boolean;
+  solid?: boolean;
 };
 
-export function Avatar({
-  size = 'md',
-  shape = 'circle',
-  variant = 'soft',
-  className,
-  ...props
-}: AvatarProps) {
+export function Avatar({ size, square, solid, className, ...props }: AvatarProps) {
   return (
     <span
       className={clsx(
         'sa-avatar',
-        size !== 'md' && `sa-avatar--${size}`,
-        shape === 'square' && 'sa-avatar--sq',
-        variant === 'solid' && 'sa-avatar--solid',
+        size && `sa-avatar--${size}`,
+        solid && 'sa-avatar--solid',
+        square && 'sa-avatar--sq',
         className,
       )}
       {...props}

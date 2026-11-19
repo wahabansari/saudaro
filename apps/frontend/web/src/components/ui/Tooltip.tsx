@@ -1,45 +1,32 @@
 'use client';
 
-import * as TooltipPrimitive from '@radix-ui/react-tooltip';
+import * as T from '@radix-ui/react-tooltip';
 import clsx from 'clsx';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactElement, ReactNode } from 'react';
 
-export type TooltipProps = Omit<ComponentProps<typeof TooltipPrimitive.Content>, 'content'> & {
+export type TooltipProps = Omit<ComponentProps<typeof T.Content>, 'content'> & {
   content: ReactNode;
-  delayDuration?: number;
-  open?: boolean;
-  container?: HTMLElement;
+  children: ReactElement;
 };
 
-export function Tooltip({
-  content,
-  children,
-  delayDuration = 300,
-  className,
-  sideOffset = 6,
-  open,
-  container,
-  ...props
-}: TooltipProps) {
+export function Tooltip({ content, children, className, ...props }: TooltipProps) {
   return (
-    <TooltipPrimitive.Provider delayDuration={delayDuration}>
-      <TooltipPrimitive.Root open={open}>
-        <TooltipPrimitive.Trigger asChild className="data-[state=closed]:![animation:none]">
+    <T.Provider delayDuration={300}>
+      <T.Root>
+        <T.Trigger asChild className="data-[state=closed]:![animation:none]">
           {children}
-        </TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal container={container}>
-          <TooltipPrimitive.Content
-            className={clsx(
-              'sa-tip z-tooltip [--pop-origin:var(--radix-tooltip-content-transform-origin)]',
-              className,
-            )}
-            sideOffset={sideOffset}
+        </T.Trigger>
+        <T.Portal>
+          <T.Content
+            sideOffset={6}
+            collisionPadding={16}
+            className={clsx('sa-tip z-tooltip', className)}
             {...props}
           >
             {content}
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
-      </TooltipPrimitive.Root>
-    </TooltipPrimitive.Provider>
+          </T.Content>
+        </T.Portal>
+      </T.Root>
+    </T.Provider>
   );
 }

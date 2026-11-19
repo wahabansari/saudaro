@@ -1,23 +1,24 @@
 'use client';
 
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef } from 'react';
 import { Icon } from '@/icons';
 
-export type TagProps = Omit<ComponentPropsWithRef<'span'>, 'children'> & {
+export type TagProps = Omit<ComponentProps<'span'>, 'children'> & {
   children: string;
+  mono?: boolean;
   onRemove?: () => void;
 };
 
-export function Tag({ children, onRemove, className, ...props }: TagProps) {
+export function Tag({ mono, onRemove, className, children, ...props }: TagProps) {
   return (
-    <span className={clsx('sa-tag', className)} {...props}>
+    <span className={clsx('sa-tag', mono && 'sa-mono', 'max-w-full', className)} {...props}>
       {children}
-      {onRemove ? (
+      {onRemove && (
         <button type="button" aria-label={`Remove tag ${children}`} onClick={onRemove}>
           <Icon name="x" size={20} />
         </button>
-      ) : null}
+      )}
     </span>
   );
 }

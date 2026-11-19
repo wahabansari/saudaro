@@ -1,23 +1,18 @@
+import type { ComponentProps } from 'react';
 import clsx from 'clsx';
-import type { ComponentPropsWithRef } from 'react';
 
-export type CardProps = ComponentPropsWithRef<'div'> & { flush?: boolean };
-export type CardLinkProps = ComponentPropsWithRef<'a'> & { flush?: boolean };
-export type CardMediaProps = ComponentPropsWithRef<'div'>;
-export type CardBodyProps = ComponentPropsWithRef<'div'>;
+export type CardProps = ComponentProps<'div'> & { flush?: boolean };
 
 export function Card({ flush, className, ...props }: CardProps) {
-  return <div className={clsx('sa-card', flush && 'sa-card--flush', className)} {...props} />;
+  return (
+    <div className={clsx('sa-card', flush && 'sa-card--flush', 'min-w-0 max-w-full', className)} {...props} />
+  );
 }
 
-export function CardLink({ flush, className, ...props }: CardLinkProps) {
-  return <a className={clsx('sa-card sa-card--link', flush && 'sa-card--flush', className)} {...props} />;
+export function CardLink({ className, ...props }: ComponentProps<'a'>) {
+  return <a className={clsx('sa-card sa-card--link', 'min-w-0 max-w-full', className)} {...props} />;
 }
 
-export function CardMedia({ className, ...props }: CardMediaProps) {
-  return <div className={clsx('sa-card__media', className)} {...props} />;
-}
-
-export function CardBody({ className, ...props }: CardBodyProps) {
+export function CardBody({ className, ...props }: ComponentProps<'div'>) {
   return <div className={clsx('sa-card__body', className)} {...props} />;
 }
